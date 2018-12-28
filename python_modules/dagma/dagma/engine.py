@@ -20,10 +20,21 @@ from dagster.core.execution_context import RuntimeExecutionContext
 from dagster.core.execution_plan.objects import ExecutionPlan
 from dagster.utils.zip import zip_folder
 
-from .config import ASSUME_ROLE_POLICY_DOCUMENT, BUCKET_POLICY_DOCUMENT_TEMPLATE
+from .config import (
+    ASSUME_ROLE_POLICY_DOCUMENT,
+    BUCKET_POLICY_DOCUMENT_TEMPLATE,
+)
 from .deployment_package import get_or_create_deployment_package
-from .serialize import deserialize, serialize
-from .utils import get_input_key, get_resources_key, get_step_key, LambdaInvocationPayload
+from .serialize import (
+    deserialize,
+    serialize,
+)
+from .utils import (
+    get_input_key,
+    get_resources_key,
+    get_step_key,
+    LambdaInvocationPayload,
+)
 
 # TODO make this configurable on the dagma resource
 LAMBDA_MEMORY_SIZE = 3008
@@ -191,6 +202,7 @@ def execute_plan(context, execution_plan, cleanup_lambda_functions=True, local=F
         key=get_resources_key(context), body=serialize(context.resources)
     )
 
+    deployment_package_key = get_or_create_deployment_package(context)
     for step_idx, step in enumerate(steps):
         context.debug(
             'Uploading step {step_key}: {s3_key}'.format(
@@ -201,6 +213,7 @@ def execute_plan(context, execution_plan, cleanup_lambda_functions=True, local=F
 
     try:
         lambda_step = _create_lambda_step(aws_lambda_client, deployment_package_key, context, role)
+
 
         for step_idx, _ in enumerate(steps):
             payload = LambdaInvocationPayload(

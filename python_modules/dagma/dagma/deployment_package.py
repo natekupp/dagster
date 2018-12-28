@@ -1,7 +1,6 @@
 """Utilities to construct and upload the deployment package used by our Lambda handler."""
 
 import contextlib
-
 # https://github.com/PyCQA/pylint/issues/73
 import distutils.spawn  # pylint: disable=no-name-in-module, import-error
 import os

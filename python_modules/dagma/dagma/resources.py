@@ -5,7 +5,11 @@ import boto3
 
 from dagster import ResourceDefinition, Dict, String, Field
 
-from .config import DEFAULT_S3_BUCKET, DEFAULT_STORAGE_CONFIG, DEFAULT_RUNTIME_BUCKET
+from .config import (
+    DEFAULT_S3_BUCKET,
+    DEFAULT_STORAGE_CONFIG,
+    DEFAULT_RUNTIME_BUCKET,
+)
 from .storage import Storage
 
 DagmaResourceConfig = Dict(
