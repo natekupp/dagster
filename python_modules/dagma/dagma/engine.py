@@ -109,7 +109,10 @@ def _create_lambda_step(aws_lambda, deployment_package, context, role):
         Runtime=runtime,
         Role=role.arn,
         Handler='dagma.aws_lambda_handler',
-        Code={'S3Bucket': context.resources.dagma.runtime_bucket, 'S3Key': deployment_package},
+        Code={
+            'S3Bucket': context.resources.dagma.runtime_bucket,
+            'S3Key': deployment_package,
+        },
         Description='Handler for run {run_id} step {step_idx}'.format(
             run_id=context.run_id, step_idx='0'
         ),
@@ -202,7 +205,6 @@ def execute_plan(context, execution_plan, cleanup_lambda_functions=True, local=F
         key=get_resources_key(context), body=serialize(context.resources)
     )
 
-    deployment_package_key = get_or_create_deployment_package(context)
     for step_idx, step in enumerate(steps):
         context.debug(
             'Uploading step {step_key}: {s3_key}'.format(
