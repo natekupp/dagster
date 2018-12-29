@@ -36,6 +36,10 @@ def tempdirs(i=1):
                 continue
 
 
+def get_function_name(context):
+    return '{run_id}_function'.format(run_id=context.run_id)
+
+
 def get_step_key(context, step_idx):
     return '{run_id}_step_{step_idx}.pickle'.format(run_id=context.run_id, step_idx=step_idx)
 

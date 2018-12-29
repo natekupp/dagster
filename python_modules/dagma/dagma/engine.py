@@ -30,6 +30,7 @@ from .serialize import (
     serialize,
 )
 from .utils import (
+    get_function_name,
     get_input_key,
     get_resources_key,
     get_step_key,
@@ -93,10 +94,6 @@ def _upload_step(s3, step_idx, step, context):
     )
 
 
-def _get_function_name(context):
-    return '{run_id}_function'.format(run_id=context.run_id)
-
-
 def _create_lambda_step(aws_lambda, deployment_package, context, role):
     runtime = _get_python_runtime()
     context.debug(
@@ -105,7 +102,7 @@ def _create_lambda_step(aws_lambda, deployment_package, context, role):
         )
     )
     res = aws_lambda.create_function(
-        FunctionName=_get_function_name(context),
+        FunctionName=get_function_name(context),
         Runtime=runtime,
         Role=role.arn,
         Handler='dagma.aws_lambda_handler',
@@ -126,6 +123,7 @@ def _create_lambda_step(aws_lambda, deployment_package, context, role):
 
 
 def _execute_step_async(lambda_client, lambda_step, context, payload):
+    raise NotImplementedError()
     #   InvocationType='Event'|'RequestResponse'|'DryRun',
     # when we switch to Event, we'll need to poll Cloudwatch
     # log_group_name = '/aws/lambda/{function_name}'
@@ -140,7 +138,6 @@ def _execute_step_async(lambda_client, lambda_step, context, payload):
     # #     nextToken='string',
     # #     limit=123
     # )
-    pass
 
 
 def _execute_step_sync(lambda_client, lambda_step, context, payload):
