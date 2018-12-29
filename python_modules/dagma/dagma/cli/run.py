@@ -22,9 +22,9 @@ from dagster.cli.dynamic_loader import (
     PipelineTargetInfo,
     repository_target_argument,
 )
+from dagster.cli.pipeline import create_pipeline_from_cli_args
 from dagster.core.execution import execute_pipeline_iterator
 from dagster.utils import load_yaml_from_glob_list
-from dagster.utils.indenting_printer import IndentingPrinter
 
 REPO_TARGET_WARNING = (
     'Can only use ONE of --repository-yaml/-y, --python-file/-f, --module-name/-m.'
@@ -37,6 +37,36 @@ LOGGING_DICT = {
     'ERROR': logging.ERROR,
     'CRITICAL': logging.CRITICAL,
 }
+
+
+def process_results_for_console(pipeline_iter):
+    results = []
+
+    for result in pipeline_iter:
+        if not result.success:
+            result.reraise_user_error()
+        results.append(result)
+
+    return results
+
+
+def execute_run_command(env, include, requirements, dagma_config, cli_args, print_fn):
+    pipeline = create_pipeline_from_cli_args(cli_args)
+    do_run_command(pipeline, env, include, requirements, dagma_config, print_fn)
+
+
+def do_run_command(
+    pipeline, env_file_list, include_file_list, requirements_file, dagma_config, printer
+):
+    check.inst_param(pipeline, 'pipeline', PipelineDefinition)
+    env_file_list = check.opt_list_param(env_file_list, 'env_file_list', of_type=str)
+    check.callable_param(printer, 'printer')
+
+    env_config = load_yaml_from_glob_list(env_file_list) if env_file_list else {}
+
+    pipeline_iter = execute_pipeline_iterator(pipeline, env_config)
+
+    process_results_for_console(pipeline_iter)
 
 
 @click.command(
@@ -55,7 +85,9 @@ LOGGING_DICT = {
             'Behavior in case of conflicting package versions is undefined.\n'
             '2. Local files outside of a pip-installable package required by the pipeline to run '
             'should be specified in a dagma.yml file or on the command line as includes '
-            '(-i, --include)\n'
+            '(-i, --include). You may specify multiple relative file paths or globs in the root '
+            'directory or its children -- parent directories and files in parent directories may '
+            'not be included.\n'
             '\n'
             'It\'s strongly encouraged to make your dependencies pip installable, and to avoid '
             'using local files outside of packages except for prototyping. \n'
@@ -78,14 +110,6 @@ LOGGING_DICT = {
         )
     )
 )
-# Dagma yaml files should be formatted as follows:
-#
-# requirements:
-#   - numpy==1.15.4
-#   - git+ssh://git@github.com/organization/project.git@tag#egg=project
-# includes:
-#   - utils/**/*.py
-#   - foo.py
 @pipeline_target_command
 @click.option(
     '-e',
@@ -134,35 +158,18 @@ LOGGING_DICT = {
         'dagster pipeline execute hello_world -r requirements.txt'
     ),
 )
-def run_command(env, **kwargs):
+@click.option(
+    '-i',
+    '--include',
+    type=click.STRING,
+    multiple=True,
+    help=('Specify one or more files or file patterns/globs to include in the remote environment.'),
+)
+def run_command(env, include, requirements, dagma_config, **kwargs):
     check.invariant(isinstance(env, tuple))
     env = list(env)
-    execute_execute_command(env, kwargs, click.echo)
 
+    check.invariant(isinstance(include, tuple))
+    include = list(include)
 
-def execute_execute_command(env, cli_args, print_fn):
-    pipeline = create_pipeline_from_cli_args(cli_args)
-    do_execute_command(pipeline, env, print_fn)
-
-
-def do_execute_command(pipeline, env_file_list, printer):
-    check.inst_param(pipeline, 'pipeline', PipelineDefinition)
-    env_file_list = check.opt_list_param(env_file_list, 'env_file_list', of_type=str)
-    check.callable_param(printer, 'printer')
-
-    env_config = load_yaml_from_glob_list(env_file_list) if env_file_list else {}
-
-    pipeline_iter = execute_pipeline_iterator(pipeline, env_config)
-
-    process_results_for_console(pipeline_iter)
-
-
-def process_results_for_console(pipeline_iter):
-    results = []
-
-    for result in pipeline_iter:
-        if not result.success:
-            result.reraise_user_error()
-        results.append(result)
-
-    return results
+    execute_run_command(env, include, kwargs, click.echo)
