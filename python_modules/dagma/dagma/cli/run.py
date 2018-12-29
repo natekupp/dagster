@@ -8,10 +8,12 @@ import textwrap
 import yaml
 
 import click
+import glob
+import requirements
 
 from dagster import (
-    PipelineDefinition,
     check,
+    PipelineDefinition,
 )
 from dagster.cli.dynamic_loader import (
     load_pipeline_from_target_info,
@@ -23,8 +25,12 @@ from dagster.cli.dynamic_loader import (
     repository_target_argument,
 )
 from dagster.cli.pipeline import create_pipeline_from_cli_args
-from dagster.core.execution import execute_pipeline_iterator
-from dagster.utils import load_yaml_from_glob_list
+from dagster.utils import (
+    load_yaml_from_path,
+    load_yaml_from_glob_list,
+)
+
+from ..execution import execute_pipeline
 
 REPO_TARGET_WARNING = (
     'Can only use ONE of --repository-yaml/-y, --python-file/-f, --module-name/-m.'
@@ -39,7 +45,7 @@ LOGGING_DICT = {
 }
 
 
-def process_results_for_console(pipeline_iter):
+def _process_results_for_console(pipeline_iter):
     results = []
 
     for result in pipeline_iter:
@@ -50,13 +56,13 @@ def process_results_for_console(pipeline_iter):
     return results
 
 
-def execute_run_command(env, include, requirements, dagma_config, cli_args, print_fn):
+def _execute_run_command(env, include, requirements_path, dagma_config_path, cli_args, print_fn):
     pipeline = create_pipeline_from_cli_args(cli_args)
-    do_run_command(pipeline, env, include, requirements, dagma_config, print_fn)
+    _do_run_command(pipeline, env, include, requirements_path, dagma_config_path, print_fn)
 
 
-def do_run_command(
-    pipeline, env_file_list, include_file_list, requirements_file, dagma_config, printer
+def _do_run_command(
+    pipeline, env_file_list, include_file_list, requirements_path, dagma_config_path, printer
 ):
     check.inst_param(pipeline, 'pipeline', PipelineDefinition)
     env_file_list = check.opt_list_param(env_file_list, 'env_file_list', of_type=str)
@@ -64,9 +70,33 @@ def do_run_command(
 
     env_config = load_yaml_from_glob_list(env_file_list) if env_file_list else {}
 
-    pipeline_iter = execute_pipeline_iterator(pipeline, env_config)
+    if requirements_path is not None:
+        with open(requirements_path, 'r') as fd:
+            reqs = requirements.parse(fd)
+            errors = []
+            for req in reqs:
+                if req.editable:
+                    errors.append(req.name)
+            if errors:
+                raise Exception(
+                    'Editable (-e/--editable) requirements are not supported: {errors}'.format(
+                        errors=', '.join(errors)
+                    )
+                )
+            fd.seek(0)
+            additional_requirements = filter(None, fd.read().split('\n'))
 
-    process_results_for_console(pipeline_iter)
+    additional_includes = []
+    for include_file_pattern in include_file_list:
+        additional_includes.extend(glob.glob(include_file_pattern))
+
+    dagma_config = load_yaml_from_path(dagma_config_path)
+
+    pipeline_iter = execute_pipeline(
+        pipeline, env_config, dagma_config, additional_requirements, additional_includes
+    )
+
+    _process_results_for_console(pipeline_iter)
 
 
 @click.command(
@@ -172,4 +202,4 @@ def run_command(env, include, requirements, dagma_config, **kwargs):
     check.invariant(isinstance(include, tuple))
     include = list(include)
 
-    execute_run_command(env, include, kwargs, click.echo)
+    _execute_run_command(env, include, kwargs, click.echo)
