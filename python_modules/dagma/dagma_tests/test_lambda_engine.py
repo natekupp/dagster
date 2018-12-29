@@ -4,8 +4,7 @@ import uuid
 from collections import namedtuple
 
 import boto3
-
-# import numpy
+import numpy
 import pytest
 
 import dagster.check as check
@@ -63,6 +62,11 @@ def solid_d(arg_b, arg_c):
     # architecture on lambda is not the architecture running the pipeline
 
 
+@lambda_solid
+def solid_e():
+    return numpy.mean([1, 2, 3])
+
+
 def define_diamond_dag_pipeline():
     return PipelineDefinition(
         name='actual_dag_pipeline',
@@ -84,6 +88,17 @@ def define_single_solid_pipeline():
         name='single_solid_pipeline',
         context_definitions=context_definitions,
         solids=[solid_a],
+        dependencies={},
+    )
+
+
+def define_numpy_pipeline():
+    return PipelineDefinition(
+        name='numpy_pipeline',
+        context_definitions=context_definitions,
+        solids=[
+            solid_e,
+        ],
         dependencies={},
     )
 
@@ -123,4 +138,15 @@ def test_execution_single():
     assert results[('solid_a.transform', 'result')][0] is True
     assert results[('solid_a.transform', 'result')][1].output_name == 'result'
     assert results[('solid_a.transform', 'result')][1].value == 1
+    assert results[('solid_a.transform', 'result')][2] is None
+
+
+def test_execution_numpy():
+    pipeline = define_numpy_pipeline()
+    results = run_test_pipeline(pipeline)
+
+    assert len(results) == 1
+    assert results[('solid_a.transform', 'result')][0] is True
+    assert results[('solid_a.transform', 'result')][1].output_name == 'result'
+    assert results[('solid_a.transform', 'result')][1].value == 2.0
     assert results[('solid_a.transform', 'result')][2] is None

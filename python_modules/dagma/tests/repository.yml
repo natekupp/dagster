@@ -1,0 +1,7 @@
+repository:
+  module: lambda_test
+  fn: define_repository
+  includes:
+    - solids.py
+  requires:
+    - numpy==1.15.4

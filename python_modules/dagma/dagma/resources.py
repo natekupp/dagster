@@ -19,8 +19,13 @@ DagmaResourceConfig = Dict(
         'aws_session_token': Field(String, is_optional=True),
         'aws_region_name': Field(String),
         's3_bucket': Field(String, default_value=DEFAULT_S3_BUCKET, is_optional=True),
-        'runtime_bucket': Field(String, default_value=DEFAULT_RUNTIME_BUCKET, is_optional=True),
-        # 'cleanup_lambda_functions': types.Field(types.Bool, default_value=False,
+        'runtime_bucket': Field(
+            String, default_value=DEFAULT_RUNTIME_BUCKET, is_optional=True
+        ),
+        'dependencies': Field(
+            List(String), default_value=[], is_optional=True
+        ),
+        # 'cleanup_lambda_functions': Field(Bool, default_value=False,
         #                                         is_optional=True),  # TODO: Thread this through
         # TODO also parametrize local tempfile cleanup
         # TODO also parametrize s3 cleanup
