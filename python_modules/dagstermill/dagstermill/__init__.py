@@ -40,6 +40,19 @@ class InMemoryDagstermillContext:
         self.solid_def = solid_def
         self.inputs = inputs
 
+    def __getitem__(self, key):
+        if key in self.inputs:
+            return self.inputs[key]
+        raise DagstermillError("Parameter {name} not in context".format(name=key))
+
+    def __setitem__(self, key, value):
+        raise DagstermillError(
+            "You should not modify the context directly. Use the unpacked parameters."
+        )
+
+    def get(self, *input_names):
+        return [self[key] for key in input_names]
+
 
 class RemotedDagstermillContext:
     def __init__(self, pipeline_def, solid_def, inputs, marshal_dir):
@@ -47,6 +60,19 @@ class RemotedDagstermillContext:
         self.solid_def = solid_def
         self.inputs = inputs
         self.marshal_dir = marshal_dir
+
+    def __getitem__(self, key):
+        if key in self.inputs:
+            return self.inputs[key]
+        raise DagstermillError("Parameter {name} not in context".format(name=key))
+
+    def __setitem__(self, key, value):
+        raise DagstermillError(
+            "You should not modify the context directly. Use the unpacked parameters."
+        )
+
+    def get(self, *input_names):
+        return [self[key] for key in input_names]
 
 
 class DagstermillError(Exception):
@@ -142,11 +168,26 @@ def marshal_value(runtime_type, value, target_file):
 MANAGER_FOR_NOTEBOOK_INSTANCE = Manager()
 
 
+def convert_context(context):
+    if isinstance(context, RemotedDagstermillContext):
+        return context
+    return MANAGER_FOR_NOTEBOOK_INSTANCE._get_cached_dagstermill_context(context)
+
+
 def declare_as_solid(pipeline_def, solid_def_name):
     return MANAGER_FOR_NOTEBOOK_INSTANCE.declare_as_solid(pipeline_def, solid_def_name)
 
 
 def define_context(inputs=None):
+    INPUT_TO_CODE = ''.join(
+        ["{parname} = context['{parname}']\n".format(parname=parname) for parname in inputs]
+    )
+
+    print(
+        "To use the parameters you've just defined, "
+        "please put the following in the cell labeled 'unpack':\n\n"
+        "{}".format(INPUT_TO_CODE)
+    )
     return MANAGER_FOR_NOTEBOOK_INSTANCE.define_context(inputs)
 
 
