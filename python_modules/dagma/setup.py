@@ -60,6 +60,7 @@ def _do_setup(name='dagma'):
             ),
             'glob2==0.6',
         ],
+        entry_points={"console_scripts": ['dagma = dagma.cli:main']},
     )
 
 
