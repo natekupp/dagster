@@ -11,10 +11,7 @@ import click
 import glob
 import requirements
 
-from dagster import (
-    check,
-    PipelineDefinition,
-)
+from dagster import check, PipelineDefinition
 from dagster.cli.dynamic_loader import (
     load_pipeline_from_target_info,
     load_repository_from_target_info,
@@ -25,10 +22,7 @@ from dagster.cli.dynamic_loader import (
     repository_target_argument,
 )
 from dagster.cli.pipeline import create_pipeline_from_cli_args
-from dagster.utils import (
-    load_yaml_from_path,
-    load_yaml_from_glob_list,
-)
+from dagster.utils import load_yaml_from_path, load_yaml_from_glob_list
 
 from ..execution import execute_pipeline
 
@@ -79,8 +73,9 @@ def _do_run_command(
                     errors.append(req.name)
             if errors:
                 raise Exception(
-                    'Editable (-e/--editable) requirements are not supported: {errors}'.format(
-                        errors=', '.join(errors)
+                    'Editable (-e/--editable) requirements are not supported: found {errors} in '
+                    'specified requirements file {requirements_file}'.format(
+                        errors=', '.join(errors), requirements_file=requirements_path
                     )
                 )
             fd.seek(0)
@@ -138,7 +133,7 @@ def _do_run_command(
             'Specifying a module and pipeline definition function:\n'
             '    $ dagma run -m a_module.submodule -n define_some_pipeline -d path/to/dagma.yml'
         )
-    )
+    ),
 )
 @pipeline_target_command
 @click.option(
@@ -152,11 +147,11 @@ def _do_run_command(
         'Files listed first take precendence. They will smash the values of subsequent '
         'files at the key-level granularity. If the file is a pattern then you must '
         'enclose it in double quotes'
-        '\n\nExample: '
-        'dagster pipeline execute pandas_hello_world -e "pandas_hello_world/*.yml"'
-        '\n\nYou can also specifiy multiple files:'
-        '\n\nExample: '
-        'dagster pipeline execute pandas_hello_world -e pandas_hello_world/solids.yml '
+        '\n\nExample: \n\n'
+        '    dagster pipeline execute pandas_hello_world -e "pandas_hello_world/*.yml"'
+        '\n\nYou can also explicitly specify multiple files:'
+        '\n\nExample: \n\n'
+        '    dagster pipeline execute pandas_hello_world -e pandas_hello_world/solids.yml '
         '-e pandas_hello_world/env.yml'
     ),
 )
@@ -168,6 +163,8 @@ def _do_run_command(
     help=(
         'Specify a dagma config yaml (required). Dagma yaml files shouldbe formatted as follows:\n'
         '\n'
+        '    engine:\n'
+        '      lambda: \n'
         '    requirements:\n'
         '      - numpy==1.15.4\n'
         '      - git+ssh://git@github.com/organization/project.git@tag#egg=project\n'
