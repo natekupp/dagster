@@ -23,7 +23,7 @@ from dagster.cli.dynamic_loader import (
     repository_target_argument,
 )
 from dagster.cli.pipeline import create_pipeline_from_cli_args
-from dagster.utils import load_yaml_from_path, load_yaml_from_glob_list
+from dagster.utils import load_yaml_from_path, load_yaml_from_glob_list, safe_isfile
 
 from ..execution import execute_pipeline
 
@@ -87,14 +87,14 @@ def _do_run_command(
 
     include_file_list = check.opt_list_param(include_file_list, 'include_file_list', of_type=str)
 
-    if requirements_path and not os.path.isfile(requirements_path):
+    if requirements_path and not safe_isfile(requirements_path):
         raise DagsterInvariantViolationError(
             'Could not find a requirements file at path {requirements_path}'.format(
                 requirements_path=requirements_path
             )
         )
 
-    if dagma_config_path and not os.path.isfile(dagma_config_path):
+    if dagma_config_path and not safe_isfile(dagma_config_path):
         raise DagsterInvariantViolationError(
             'Could not find a dagma config file at path {dagma_config_path}'.format(
                 dagma_config_path=dagma_config_path
