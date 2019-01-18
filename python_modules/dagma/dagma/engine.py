@@ -20,15 +20,8 @@ from dagster.core.execution_context import RuntimeExecutionContext
 from dagster.core.execution_plan.objects import ExecutionPlan
 from dagster.utils.zip import zip_folder
 
-from .config import (
-    ASSUME_ROLE_POLICY_DOCUMENT,
-    BUCKET_POLICY_DOCUMENT_TEMPLATE,
-)
+from .config import ASSUME_ROLE_POLICY_DOCUMENT, BUCKET_POLICY_DOCUMENT_TEMPLATE
 from .deployment_package import get_or_create_deployment_package
-from .serialize import (
-    deserialize,
-    serialize,
-)
 from .utils import (
     get_function_name,
     get_input_key,
@@ -106,10 +99,7 @@ def _create_lambda_step(aws_lambda, deployment_package, context, role):
         Runtime=runtime,
         Role=role.arn,
         Handler='dagma.aws_lambda_handler',
-        Code={
-            'S3Bucket': context.resources.dagma.runtime_bucket,
-            'S3Key': deployment_package,
-        },
+        Code={'S3Bucket': context.resources.dagma.runtime_bucket, 'S3Key': deployment_package},
         Description='Handler for run {run_id} step {step_idx}'.format(
             run_id=context.run_id, step_idx='0'
         ),
@@ -212,7 +202,6 @@ def execute_plan(context, execution_plan, cleanup_lambda_functions=True, local=F
 
     try:
         lambda_step = _create_lambda_step(aws_lambda_client, deployment_package_key, context, role)
-
 
         for step_idx, _ in enumerate(steps):
             payload = LambdaInvocationPayload(

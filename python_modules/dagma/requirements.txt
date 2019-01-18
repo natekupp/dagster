@@ -1,5 +1,6 @@
 boto3==1.9.67
 cloudpickle==0.3.1
 dagster
+git+git://github.com/dagster-io/dagster.git@dagstermill-translators#egg=dagstermill&subdirectory=python_modules/dagstermill
 glob2==0.6
 requirements-parser==0.2.0

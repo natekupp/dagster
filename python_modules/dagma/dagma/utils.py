@@ -4,6 +4,8 @@ import os
 import shutil
 import tempfile
 
+from collections import namedtuple
+
 
 def mkdir_p(path):
     try:

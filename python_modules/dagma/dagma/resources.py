@@ -3,9 +3,10 @@ from collections import namedtuple
 
 import boto3
 
-from dagster import ResourceDefinition, Dict, String, Field
+from dagster import ResourceDefinition, Dict, List, String, Field
 
 from .config import (
+    DEFAULT_AWS_REGION,
     DEFAULT_S3_BUCKET,
     DEFAULT_STORAGE_CONFIG,
     DEFAULT_RUNTIME_BUCKET,
@@ -17,14 +18,10 @@ DagmaResourceConfig = Dict(
         'aws_access_key_id': Field(String, is_optional=True),
         'aws_secret_access_key': Field(String, is_optional=True),
         'aws_session_token': Field(String, is_optional=True),
-        'aws_region_name': Field(String),
+        'aws_region_name': Field(String, default_value=DEFAULT_AWS_REGION, is_optional=True),
         's3_bucket': Field(String, default_value=DEFAULT_S3_BUCKET, is_optional=True),
-        'runtime_bucket': Field(
-            String, default_value=DEFAULT_RUNTIME_BUCKET, is_optional=True
-        ),
-        'dependencies': Field(
-            List(String), default_value=[], is_optional=True
-        ),
+        'runtime_bucket': Field(String, default_value=DEFAULT_RUNTIME_BUCKET, is_optional=True),
+        'dependencies': Field(List(String), default_value=[], is_optional=True),
         # 'cleanup_lambda_functions': Field(Bool, default_value=False,
         #                                         is_optional=True),  # TODO: Thread this through
         # TODO also parametrize local tempfile cleanup
@@ -66,9 +63,9 @@ def define_dagma_resource():
 
     def _create_dagma_resource(info):
         sessionmaker = lambda: boto3.Session(  # Otherwise, can't be pickled b/c of ssl.SSLContext
-            aws_access_key_id=info.get('aws_access_key_id'),
-            aws_secret_access_key=info.get('aws_secret_access_key'),
-            aws_session_token=info.get('aws_session_token'),
+            aws_access_key_id=info.config.get('aws_access_key_id'),
+            aws_secret_access_key=info.config.get('aws_secret_access_key'),
+            aws_session_token=info.config.get('aws_session_token'),
             region_name=info.config['aws_region_name'],
         )
 

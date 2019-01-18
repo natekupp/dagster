@@ -2,6 +2,9 @@
 
 from .version import __version__
 
+
+DEFAULT_AWS_REGION = 'us-east-2'
+
 DEFAULT_S3_BUCKET = 'dagster-lambda-execution'
 
 DEFAULT_PUT_OBJECT_KWARGS = {'ACL': 'bucket-owner-full-control', 'StorageClass': 'STANDARD'}

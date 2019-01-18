@@ -199,4 +199,8 @@ def run_command(env, include, requirements, dagma_config, **kwargs):
     check.invariant(isinstance(include, tuple))
     include = list(include)
 
-    _execute_run_command(env, include, kwargs, click.echo)
+    check.opt_str_param(requirements)
+
+    check.str_param(dagma_config)
+
+    _execute_run_command(env, include, requirements, dagma_config, kwargs, click.echo)
