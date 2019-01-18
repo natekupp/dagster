@@ -5,24 +5,12 @@ from __future__ import print_function
 import glob
 import logging
 import os
-import re
-import textwrap
-import yaml
 
 import click
 import requirements
 
 from dagster import check, DagsterInvariantViolationError, PipelineDefinition
-from dagster.cli.dynamic_loader import (
-    load_pipeline_from_target_info,
-    load_repository_from_target_info,
-    load_repository_object_from_target_info,
-    load_target_info_from_cli_args,
-    pipeline_target_command,
-    PipelineTargetInfo,
-    repository_target_argument,
-)
-from dagster.cli.pipeline import create_pipeline_from_cli_args
+from dagster.cli.pipeline import create_pipeline_from_cli_args, pipeline_target_command
 from dagster.utils import load_yaml_from_path, load_yaml_from_glob_list, safe_isfile
 
 from ..execution import execute_pipeline
@@ -108,6 +96,9 @@ def _do_run_command(
     additional_includes = []
     for include_file_pattern in include_file_list:
         additional_includes.extend(glob.glob(include_file_pattern))
+    additional_includes = [
+        os.path.join(os.getcwd(), additional_include) for additional_include in additional_includes
+    ]
 
     dagma_config = load_yaml_from_path(dagma_config_path)
 

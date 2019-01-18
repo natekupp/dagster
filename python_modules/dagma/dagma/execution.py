@@ -123,6 +123,14 @@ DagmaConfigType = SystemNamedDict(
 )
 
 
+def construct_dagma_config(config_value, additional_requirements, additional_includes):
+    return DagmaConfig(
+        engine=construct_engine_config(config_value['engine']),
+        requirements=RequirementsConfig(config_value['requirements'] + additional_requirements),
+        includes=construct_includes(config_value['includes'], additional_includes),
+    )
+
+
 def create_typed_dagma_environment(
     pipeline, dagma_config=None, additional_requirements=None, additional_includes=None
 ):
@@ -136,7 +144,7 @@ def create_typed_dagma_environment(
     if not result.success:
         raise PipelineConfigEvaluationError(pipeline, result.errors, dagma_config)
 
-    return construct_environment_config(result.value)
+    return construct_dagma_config(result.value, additional_requirements, additional_includes)
 
 
 def execute_pipeline(
