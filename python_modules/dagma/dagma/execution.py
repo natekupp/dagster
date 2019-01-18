@@ -1,3 +1,5 @@
+from collections import namedtuple
+
 from dagster import (
     check,
     Dict,
@@ -121,6 +123,11 @@ DagmaConfigType = SystemNamedDict(
         ),
     },
 )
+
+
+class DagmaConfig(namedtuple('_DagmaConfig', 'engine requirements includes')):
+    def __new__(cls, engine=None, requirements=None, includes=None):
+        check.opt_inst_param()
 
 
 def construct_dagma_config(config_value, additional_requirements, additional_includes):
