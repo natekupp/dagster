@@ -1,0 +1,9 @@
+engine:
+  lambda:
+    aws_region: 'us-east-2'
+    execution_s3_bucket: 'dagster-lambda-execution'
+    runtime_s3_bucket: 'dagma-runtime-test'
+    storage_config:
+      put_object_kwargs:
+        ACL: 'bucket-owner-full-control'
+        StorageClass: 'STANDARD'

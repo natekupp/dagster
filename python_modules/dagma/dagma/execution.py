@@ -1,5 +1,125 @@
-from dagster import check, PipelineDefinition, ReentrantInfo
+from dagster import check, Dict, Field, List, PipelineDefinition, ReentrantInfo, String
 from dagster.core.execution import create_typed_environment, get_subset_pipeline
+from dagster.core.system_config.types import (
+    define_maybe_optional_selector_field,
+    SystemNamedDict,
+    SystemNamedSelector,
+)
+
+from .config import (
+    DEFAULT_PUT_OBJECT_ACL,
+    DEFAULT_PUT_OBJECT_STORAGE_CLASS,
+    VALID_AWS_REGIONS,
+    VALID_S3_ACLS,
+    VALID_STORAGE_CLASSES,
+)
+
+
+def _format_str_options(options):
+    return '|'.join(['`\'{option}\'`'.format(option=option) for option in options])
+
+
+DagmaAirflowEngineConfig = SystemNamedDict(name='DagmaAirflowEngineConfig', fields={})
+
+DagmaLambdaEngineConfig = SystemNamedDict(
+    name='DagmaLambdaEngineConfig',
+    fields={
+        'aws_region': Field(
+            String,  # FIXME this should be an enum
+            description='The AWS region in which to launch lambda functions. Note that this '
+            'region must be compatible with the values for `execution_s3_bucket` and '
+            '`runtime_s3_bucket`. Must be one of {valid_aws_regions}.'.format(
+                valid_aws_regions=_format_str_options(VALID_AWS_REGIONS)
+            ),
+        ),
+        'execution_s3_bucket': Field(
+            String,
+            description='The S3 bucket in which to store lambda functions. Note that this bucket '
+            'must be in the region specified by `aws_region`.',
+        ),
+        'runtime_s3_bucket': Field(
+            String,
+            description='The S3 bucket in which to store the dagma '
+            'runtime. Note that this bucket must be in the region '
+            'specified by `aws_region`.',
+        ),
+        'storage_config': Field(
+            SystemNamedDict(
+                name='DagmaLambdaEngineS3StorageConfig',
+                fields={
+                    'put_object_kwargs': SystemNamedDict(
+                        name='DagmaLambdaEngineS3StoragePutObjectKwargs',
+                        fields={
+                            'ACL': Field(
+                                String,
+                                default_value=DEFAULT_PUT_OBJECT_ACL,
+                                description='The ACL to apply when lambda '
+                                'functions are uploaded to the execution '
+                                'bucket. Must be one of {valid_put_object_acls}. Default is '
+                                '\'{default_put_object_acl}\'.'.format(
+                                    valid_put_object_acls=_format_str_options(VALID_S3_ACLS),
+                                    default_put_object_acl=DEFAULT_PUT_OBJECT_ACL,
+                                ),
+                            ),  # FIXME this should be an enum
+                            'StorageClass': Field(
+                                String,
+                                default_value=DEFAULT_PUT_OBJECT_STORAGE_CLASS,
+                                description='The StorageClass for lambda '
+                                'functions uploaded to the execution '
+                                'bucket. Must be one of {valid_storage_classes}. Default is '
+                                '\'{default_put_object_storage_class}\'.'.format(
+                                    valid_storage_classes=_format_str_options(
+                                        VALID_STORAGE_CLASSES
+                                    ),
+                                    default_put_object_storage_class=DEFAULT_PUT_OBJECT_STORAGE_CLASS,
+                                ),  # FIXME this should be an enum
+                            ),
+                        },
+                    )
+                },
+            )
+        ),
+    },
+)
+
+DagmaConfigType = SystemNamedDict(
+    name='DagmaConfig',
+    fields={
+        'engine': define_maybe_optional_selector_field(
+            SystemNamedSelector(
+                name='DagmaEngineConfig',
+                fields={
+                    'lambda': Field(DagmaLambdaEngineConfig),
+                    'airflow': Field(DagmaAirflowEngineConfig),
+                },
+            )
+        ),
+        'requirements': Field(
+            List(String),
+            is_optional=True,
+            description='A list of pip-installable python requirements to be installed in the '
+            'remote execution environment. Note that installing in --editable mode (-e) is not '
+            'supported.',
+        ),
+    },
+)
+
+
+def create_typed_dagma_environment(
+    pipeline, dagma_config=None, additional_requirements=None, additional_includes=None
+):
+    check.inst_param(pipeline, 'pipeline', PipelineDefinition)
+    check.opt_dict_param(dagma_config, 'dagma_config')
+    check.opt_list_param(additional_requirements, 'additional_requirements')
+    check.opt_list_param(additional_includes, 'additional_includes')
+
+    apply_default_values(dagma_config)
+    result = evaluate_config_value(pipeline.environment_type, environment)
+
+    if not result.success:
+        raise PipelineConfigEvaluationError(pipeline, result.errors, environment)
+
+    return construct_environment_config(result.value)
 
 
 def execute_pipeline(
