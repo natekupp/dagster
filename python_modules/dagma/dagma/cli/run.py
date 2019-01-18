@@ -2,16 +2,17 @@
 
 from __future__ import print_function
 
+import glob
 import logging
+import os
 import re
 import textwrap
 import yaml
 
 import click
-import glob
 import requirements
 
-from dagster import check, PipelineDefinition
+from dagster import check, DagsterInvariantViolationError, PipelineDefinition
 from dagster.cli.dynamic_loader import (
     load_pipeline_from_target_info,
     load_repository_from_target_info,
@@ -39,6 +40,27 @@ LOGGING_DICT = {
 }
 
 
+def _get_additional_requirements(requirements_path):
+    if requirements_path is None:
+        return []
+
+    with open(requirements_path, 'r') as fd:
+        reqs = requirements.parse(fd)
+        errors = []
+        for req in reqs:
+            if req.editable:
+                errors.append(req.name)
+        if errors:
+            raise Exception(
+                'Editable (-e/--editable) requirements are not supported: found {errors} in '
+                'specified requirements file {requirements_file}'.format(
+                    errors=', '.join(errors), requirements_file=requirements_path
+                )
+            )
+        fd.seek(0)
+        return filter(None, fd.read().split('\n'))
+
+
 def _process_results_for_console(pipeline_iter):
     results = []
 
@@ -59,27 +81,29 @@ def _do_run_command(
     pipeline, env_file_list, include_file_list, requirements_path, dagma_config_path, printer
 ):
     check.inst_param(pipeline, 'pipeline', PipelineDefinition)
-    env_file_list = check.opt_list_param(env_file_list, 'env_file_list', of_type=str)
     check.callable_param(printer, 'printer')
+
+    env_file_list = check.opt_list_param(env_file_list, 'env_file_list', of_type=str)
+
+    include_file_list = check.opt_list_param(include_file_list, 'include_file_list', of_type=str)
+
+    if requirements_path and not os.path.isfile(requirements_path):
+        raise DagsterInvariantViolationError(
+            'Could not find a requirements file at path {requirements_path}'.format(
+                requirements_path=requirements_path
+            )
+        )
+
+    if dagma_config_path and not os.path.isfile(dagma_config_path):
+        raise DagsterInvariantViolationError(
+            'Could not find a dagma config file at path {dagma_config_path}'.format(
+                dagma_config_path=dagma_config_path
+            )
+        )
 
     env_config = load_yaml_from_glob_list(env_file_list) if env_file_list else {}
 
-    if requirements_path is not None:
-        with open(requirements_path, 'r') as fd:
-            reqs = requirements.parse(fd)
-            errors = []
-            for req in reqs:
-                if req.editable:
-                    errors.append(req.name)
-            if errors:
-                raise Exception(
-                    'Editable (-e/--editable) requirements are not supported: found {errors} in '
-                    'specified requirements file {requirements_file}'.format(
-                        errors=', '.join(errors), requirements_file=requirements_path
-                    )
-                )
-            fd.seek(0)
-            additional_requirements = filter(None, fd.read().split('\n'))
+    additional_requirements = _get_additional_requirements(requirements_path)
 
     additional_includes = []
     for include_file_pattern in include_file_list:
@@ -192,15 +216,15 @@ def _do_run_command(
     multiple=True,
     help=('Specify one or more files or file patterns/globs to include in the remote environment.'),
 )
-def run_command(env, include, requirements, dagma_config, **kwargs):
+def run_command(env, include, requirements, dagma_config, **kwargs):  # pylint:disable=W0621
     check.invariant(isinstance(env, tuple))
     env = list(env)
 
     check.invariant(isinstance(include, tuple))
     include = list(include)
 
-    check.opt_str_param(requirements)
+    check.opt_str_param(requirements, 'requirements')
 
-    check.str_param(dagma_config)
+    check.str_param(dagma_config, 'dagma_config')
 
     _execute_run_command(env, include, requirements, dagma_config, kwargs, click.echo)
