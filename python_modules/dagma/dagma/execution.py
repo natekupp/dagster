@@ -1,5 +1,15 @@
-from dagster import check, Dict, Field, List, PipelineDefinition, ReentrantInfo, String
+from dagster import (
+    check,
+    Dict,
+    Field,
+    List,
+    PipelineConfigEvaluationError,
+    PipelineDefinition,
+    ReentrantInfo,
+    String,
+)
 from dagster.core.execution import create_typed_environment, get_subset_pipeline
+from dagster.core.types.evaluator import evaluate_config_value
 from dagster.core.system_config.types import (
     define_maybe_optional_selector_field,
     SystemNamedDict,
@@ -101,6 +111,14 @@ DagmaConfigType = SystemNamedDict(
             'remote execution environment. Note that installing in --editable mode (-e) is not '
             'supported.',
         ),
+        'includes': Field(
+            List(String),
+            is_optional=True,
+            description='A list of local files to include in the remote execution environment. '
+            'Paths should be relative to the location of the config file, which is treated as the '
+            'root directory -- i.e., paths must point to the same directory as the config file or '
+            'any of its children, but not to parent and peer directories.',
+        ),
     },
 )
 
@@ -113,11 +131,10 @@ def create_typed_dagma_environment(
     check.opt_list_param(additional_requirements, 'additional_requirements')
     check.opt_list_param(additional_includes, 'additional_includes')
 
-    apply_default_values(dagma_config)
-    result = evaluate_config_value(pipeline.environment_type, environment)
+    result = evaluate_config_value(DagmaConfigType, dagma_config)
 
     if not result.success:
-        raise PipelineConfigEvaluationError(pipeline, result.errors, environment)
+        raise PipelineConfigEvaluationError(pipeline, result.errors, dagma_config)
 
     return construct_environment_config(result.value)
 
