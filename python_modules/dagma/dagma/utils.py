@@ -58,7 +58,5 @@ def get_resources_key(context):
     return '{run_id}_resources.pickle'.format(run_id=context.run_id)
 
 
-LambdaInvocationPayload = namedtuple(
-    'LambdaInvocationPayload',
-    'run_id step_idx key s3_bucket s3_key_inputs s3_key_body ' 's3_key_resources s3_key_outputs',
-)
+def format_str_options(options):
+    return '|'.join(['`\'{option}\'`'.format(option=option) for option in options])

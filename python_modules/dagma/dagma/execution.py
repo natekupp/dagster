@@ -1,7 +1,10 @@
+from abc import ABC
 from collections import namedtuple
 
 from dagster import (
     check,
+    ConfigType,
+    DagsterEvaluateConfigValueError,
     Dict,
     Field,
     List,
@@ -17,6 +20,7 @@ from dagster.core.system_config.types import (
     SystemNamedDict,
     SystemNamedSelector,
 )
+from dagster.utils import single_item
 
 from .config import (
     DEFAULT_PUT_OBJECT_ACL,
@@ -25,23 +29,32 @@ from .config import (
     VALID_S3_ACLS,
     VALID_STORAGE_CLASSES,
 )
+from .utils import format_str_options
 
 
-def _format_str_options(options):
-    return '|'.join(['`\'{option}\'`'.format(option=option) for option in options])
+DagmaAirflowEngineConfigType = SystemNamedDict(name='DagmaAirflowEngineConfig', fields={})
 
-
-DagmaAirflowEngineConfig = SystemNamedDict(name='DagmaAirflowEngineConfig', fields={})
-
-DagmaLambdaEngineConfig = SystemNamedDict(
+DagmaLambdaEngineConfigType = SystemNamedDict(
     name='DagmaLambdaEngineConfig',
     fields={
+        'aws_access_key_id': Field(
+            String,
+            is_optional=True,
+            description='Optionally specify the aws_access_key_id, overriding the usual boto3 '
+            'credential chain.',
+        ),
+        'aws_secret_access_key': Field(
+            String,
+            is_optional=True,
+            description='Optionally specify the aws_secret_access_key, overriding the usual boto3 '
+            'credential chain.',
+        ),
         'aws_region': Field(
             String,  # FIXME this should be an enum
             description='The AWS region in which to launch lambda functions. Note that this '
             'region must be compatible with the values for `execution_s3_bucket` and '
             '`runtime_s3_bucket`. Must be one of {valid_aws_regions}.'.format(
-                valid_aws_regions=_format_str_options(VALID_AWS_REGIONS)
+                valid_aws_regions=format_str_options(VALID_AWS_REGIONS)
             ),
         ),
         'execution_s3_bucket': Field(
@@ -59,33 +72,42 @@ DagmaLambdaEngineConfig = SystemNamedDict(
             SystemNamedDict(
                 name='DagmaLambdaEngineS3StorageConfig',
                 fields={
-                    'put_object_kwargs': SystemNamedDict(
-                        name='DagmaLambdaEngineS3StoragePutObjectKwargs',
-                        fields={
-                            'ACL': Field(
-                                String,
-                                default_value=DEFAULT_PUT_OBJECT_ACL,
-                                description='The ACL to apply when lambda '
-                                'functions are uploaded to the execution '
-                                'bucket. Must be one of {valid_put_object_acls}. Default is '
-                                '\'{default_put_object_acl}\'.'.format(
-                                    valid_put_object_acls=_format_str_options(VALID_S3_ACLS),
-                                    default_put_object_acl=DEFAULT_PUT_OBJECT_ACL,
-                                ),
-                            ),  # FIXME this should be an enum
-                            'StorageClass': Field(
-                                String,
-                                default_value=DEFAULT_PUT_OBJECT_STORAGE_CLASS,
-                                description='The StorageClass for lambda '
-                                'functions uploaded to the execution '
-                                'bucket. Must be one of {valid_storage_classes}. Default is '
-                                '\'{default_put_object_storage_class}\'.'.format(
-                                    valid_storage_classes=_format_str_options(
-                                        VALID_STORAGE_CLASSES
+                    'put_object_kwargs': Field(
+                        SystemNamedDict(
+                            name='DagmaLambdaEngineS3StoragePutObjectKwargs',
+                            fields={
+                                'ACL': Field(
+                                    String,
+                                    is_optional=True,
+                                    default_value=DEFAULT_PUT_OBJECT_ACL,
+                                    description='The ACL to apply when lambda '
+                                    'functions are uploaded to the execution '
+                                    'bucket. Must be one of {valid_put_object_acls}. Default is '
+                                    '\'{default_put_object_acl}\'.'.format(
+                                        valid_put_object_acls=format_str_options(VALID_S3_ACLS),
+                                        default_put_object_acl=DEFAULT_PUT_OBJECT_ACL,
                                     ),
-                                    default_put_object_storage_class=DEFAULT_PUT_OBJECT_STORAGE_CLASS,
                                 ),  # FIXME this should be an enum
-                            ),
+                                'StorageClass': Field(
+                                    String,
+                                    is_optional=True,
+                                    default_value=DEFAULT_PUT_OBJECT_STORAGE_CLASS,
+                                    description='The StorageClass for lambda '
+                                    'functions uploaded to the execution '
+                                    'bucket. Must be one of {valid_storage_classes}. Default is '
+                                    '\'{default_put_object_storage_class}\'.'.format(
+                                        valid_storage_classes=format_str_options(
+                                            VALID_STORAGE_CLASSES
+                                        ),
+                                        default_put_object_storage_class=DEFAULT_PUT_OBJECT_STORAGE_CLASS,
+                                    ),  # FIXME this should be an enum
+                                ),
+                            },
+                        ),
+                        is_optional=True,
+                        default_value={
+                            'ACL': DEFAULT_PUT_OBJECT_ACL,
+                            'StorageClass': DEFAULT_PUT_OBJECT_STORAGE_CLASS,
                         },
                     )
                 },
@@ -101,8 +123,8 @@ DagmaConfigType = SystemNamedDict(
             SystemNamedSelector(
                 name='DagmaEngineConfig',
                 fields={
-                    'lambda': Field(DagmaLambdaEngineConfig),
-                    'airflow': Field(DagmaAirflowEngineConfig),
+                    'lambda': Field(DagmaLambdaEngineConfigType),
+                    'airflow': Field(DagmaAirflowEngineConfigType),
                 },
             )
         ),
@@ -122,15 +144,45 @@ DagmaConfigType = SystemNamedDict(
             'any of its children, but not to parent and peer directories.',
         ),
     },
-)
+).inst()
+
+
+class DagmaEngineConfig(ABC):
+    pass
+
+
+class AirflowEngineConfig(namedtuple('_AirflowEngineConfig', ''), DagmaEngineConfig):
+    pass
+
+
+class LambdaEngineConfig(namedtuple('_LambdaEngineConfig', 'sessionmaker'), DagmaEngineConfig):
+    pass
+
+
+def construct_engine_config(engine_config_value):
+    engine, field = single_item(engine_config_value)
+    if engine == 'airflow':
+        return AirflowEngineConfig(**field)
+    elif engine == 'lambda':
+        return LambdaEngineConfig(**field)
+    else:
+        raise DagsterEvaluateConfigValueError(
+            'Shouldn\'t be here: Didn\'t recognize engine type \'{engine}\'. Supported engines '
+            'are \'airflow\' and \'lambda\'.'.format(engine=engine)
+        )
 
 
 class DagmaConfig(namedtuple('_DagmaConfig', 'engine requirements includes')):
     def __new__(cls, engine=None, requirements=None, includes=None):
-        check.opt_inst_param()
+        check.opt_inst_param(engine, 'engine', DagmaEngineConfig)
+        check.opt_list_param(requirements, 'requirements')
+        check.opt_list_param(includes, 'includes')
+
+        return super(DagmaConfig, cls).__new__(cls, engine, requirements, includes)
 
 
 def construct_dagma_config(config_value, additional_requirements, additional_includes):
+    raise Exception()
     return DagmaConfig(
         engine=construct_engine_config(config_value['engine']),
         requirements=RequirementsConfig(config_value['requirements'] + additional_requirements),
@@ -201,4 +253,3 @@ def execute_pipeline(
 
     # Munge the dagma includes into the resource
     # Munge the dagma requirements into the resource
-    return []

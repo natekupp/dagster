@@ -5,31 +5,7 @@ import boto3
 
 from dagster import ResourceDefinition, Dict, List, String, Field
 
-from .config import (
-    DEFAULT_AWS_REGION,
-    DEFAULT_S3_BUCKET,
-    DEFAULT_STORAGE_CONFIG,
-    DEFAULT_RUNTIME_BUCKET,
-)
 from .storage import Storage
-
-DagmaResourceConfig = Dict(
-    {
-        'aws_access_key_id': Field(String, is_optional=True),
-        'aws_secret_access_key': Field(String, is_optional=True),
-        'aws_session_token': Field(String, is_optional=True),
-        'aws_region_name': Field(String, default_value=DEFAULT_AWS_REGION, is_optional=True),
-        's3_bucket': Field(String, default_value=DEFAULT_S3_BUCKET, is_optional=True),
-        'runtime_bucket': Field(String, default_value=DEFAULT_RUNTIME_BUCKET, is_optional=True),
-        'dependencies': Field(List(String), default_value=[], is_optional=True),
-        # 'cleanup_lambda_functions': Field(Bool, default_value=False,
-        #                                         is_optional=True),  # TODO: Thread this through
-        # TODO also parametrize local tempfile cleanup
-        # TODO also parametrize s3 cleanup
-        # TODO use config to pass nested typed kwargs to aws clients
-    }
-)
-"""The dagma resource config type."""
 
 
 class DagmaResourceType(

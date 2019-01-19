@@ -22,13 +22,8 @@ from dagster.utils.zip import zip_folder
 
 from .config import ASSUME_ROLE_POLICY_DOCUMENT, BUCKET_POLICY_DOCUMENT_TEMPLATE
 from .deployment_package import get_or_create_deployment_package
-from .utils import (
-    get_function_name,
-    get_input_key,
-    get_resources_key,
-    get_step_key,
-    LambdaInvocationPayload,
-)
+from .types import LambdaInvocationPayload
+from .utils import get_function_name, get_input_key, get_resources_key, get_step_key
 
 # TODO make this configurable on the dagma resource
 LAMBDA_MEMORY_SIZE = 3008

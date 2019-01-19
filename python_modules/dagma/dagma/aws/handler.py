@@ -10,7 +10,7 @@ from dagster.core.execution_context import RuntimeExecutionContext
 from dagster.core.execution_plan.objects import StepResult
 from dagster.core.execution_plan.simple_engine import execute_step
 
-from ..utils import LambdaInvocationPayload
+from ..types import LambdaInvocationPayload
 
 logger = logging.getLogger(__name__)
 
