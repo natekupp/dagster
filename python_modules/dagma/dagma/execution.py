@@ -1,3 +1,5 @@
+import boto3
+
 from abc import ABC
 from collections import namedtuple
 
@@ -22,6 +24,8 @@ from dagster.core.system_config.types import (
 )
 from dagster.utils import single_item
 
+from .aws_lambda import Storage
+
 from .config import (
     DEFAULT_PUT_OBJECT_ACL,
     DEFAULT_PUT_OBJECT_STORAGE_CLASS,
@@ -41,13 +45,15 @@ DagmaLambdaEngineConfigType = SystemNamedDict(
             String,
             is_optional=True,
             description='Optionally specify the aws_access_key_id, overriding the usual boto3 '
-            'credential chain.',
+            'credential chain. If you set this parameter, you must also set aws_secret_access_key, '
+            'and you may not set aws_session_token.',
         ),
         'aws_secret_access_key': Field(
             String,
             is_optional=True,
             description='Optionally specify the aws_secret_access_key, overriding the usual boto3 '
-            'credential chain.',
+            'credential chain. If you set this parameter, you must also set aws_access_key_id, '
+            'and you may not set aws_session_token.',
         ),
         'aws_region': Field(
             String,  # FIXME this should be an enum
@@ -56,6 +62,12 @@ DagmaLambdaEngineConfigType = SystemNamedDict(
             '`runtime_s3_bucket`. Must be one of {valid_aws_regions}.'.format(
                 valid_aws_regions=format_str_options(VALID_AWS_REGIONS)
             ),
+        ),
+        'aws_session_token': Field(
+            String,
+            description='Optionally specify an AWS session token, overriding the usual boto3 '
+            'credentiual chain. If you set this parameter, you must not also set '
+            'aws_access_key_id or aws_secret_access_key.',
         ),
         'execution_s3_bucket': Field(
             String,
@@ -148,6 +160,8 @@ DagmaConfigType = SystemNamedDict(
 
 
 class DagmaEngineConfig(ABC):
+    '''Abstract base class for dagma engine configs.'''
+
     pass
 
 
@@ -155,7 +169,10 @@ class AirflowEngineConfig(namedtuple('_AirflowEngineConfig', ''), DagmaEngineCon
     pass
 
 
-class LambdaEngineConfig(namedtuple('_LambdaEngineConfig', 'sessionmaker'), DagmaEngineConfig):
+class LambdaEngineConfig(
+    namedtuple('_LambdaEngineConfig', 'sessionmaker runtime_s3_bucket execution_s3_bucket storage'),
+    DagmaEngineConfig,
+):
     pass
 
 
@@ -164,7 +181,46 @@ def construct_engine_config(engine_config_value):
     if engine == 'airflow':
         return AirflowEngineConfig(**field)
     elif engine == 'lambda':
-        return LambdaEngineConfig(**field)
+        aws_access_key_id = field.get('aws_access_key_id')
+        aws_secret_access_key = field.get('aws_secret_access_key')
+        aws_session_token = field.get('aws_session_token')
+        aws_region_name = field['aws_region']
+
+        if aws_access_key_id or aws_secret_access_key:
+            if not (aws_access_key_id and aws_secret_access_key):
+                raise DagsterEvaluateConfigValueError(
+                    'Found a value for {found_key} but not {missing_key}. You must set both or '
+                    'neither (and use the default boto3 credential chain instead).'.format(
+                        found_key=(
+                            'aws_access_key_id' if aws_access_key_id else 'aws_secret_access_key'
+                        ),
+                        missing_key=(
+                            'aws_access_key_id'
+                            if not aws_access_key_id
+                            else 'aws_secret_access_key'
+                        ),
+                    )
+                )
+            if aws_session_token:
+                raise DagsterEvaluateConfigValueError(
+                    'You may not set aws_access_key_id or aws_secret_access_key when using an AWS '
+                    'session token'
+                )
+
+        sessionmaker = lambda: boto3.Session(
+            aws_access_key_id=aws_access_key_id,
+            aws_secret_access_key=aws_secret_access_key,
+            aws_session_token=aws_session_token,
+            region_name=aws_region_name,
+        )
+        storage = 
+        raise Exception()
+        return LambdaEngineConfig(
+            sessionmaker=sessionmaker,
+            runtime_s3_bucket=field['runtime_s3_bucket'],
+            execution_s3_bucket=field['execution_s3_bucket'],
+            storage,
+        )
     else:
         raise DagsterEvaluateConfigValueError(
             'Shouldn\'t be here: Didn\'t recognize engine type \'{engine}\'. Supported engines '
@@ -182,7 +238,6 @@ class DagmaConfig(namedtuple('_DagmaConfig', 'engine requirements includes')):
 
 
 def construct_dagma_config(config_value, additional_requirements, additional_includes):
-    raise Exception()
     return DagmaConfig(
         engine=construct_engine_config(config_value['engine']),
         requirements=RequirementsConfig(config_value['requirements'] + additional_requirements),
