@@ -1,4 +1,5 @@
 import boto3
+from requirements import parse as parse_requirements
 
 from abc import ABC
 from collections import namedtuple
@@ -65,6 +66,7 @@ DagmaLambdaEngineConfigType = SystemNamedDict(
         ),
         'aws_session_token': Field(
             String,
+            is_optional=True,
             description='Optionally specify an AWS session token, overriding the usual boto3 '
             'credentiual chain. If you set this parameter, you must not also set '
             'aws_access_key_id or aws_secret_access_key.',
@@ -185,6 +187,8 @@ def construct_engine_config(engine_config_value):
         aws_secret_access_key = field.get('aws_secret_access_key')
         aws_session_token = field.get('aws_session_token')
         aws_region_name = field['aws_region']
+        runtime_s3_bucket = field['runtime_s3_bucket']
+        execution_s3_bucket = field['execution_s3_bucket']
 
         if aws_access_key_id or aws_secret_access_key:
             if not (aws_access_key_id and aws_secret_access_key):
@@ -213,16 +217,15 @@ def construct_engine_config(engine_config_value):
             aws_session_token=aws_session_token,
             region_name=aws_region_name,
         )
-        storage = 
-        raise Exception()
+        storage = Storage(sessionmaker, execution_s3_bucket, **field['storage_config'])
         return LambdaEngineConfig(
             sessionmaker=sessionmaker,
-            runtime_s3_bucket=field['runtime_s3_bucket'],
-            execution_s3_bucket=field['execution_s3_bucket'],
-            storage,
+            runtime_s3_bucket=runtime_s3_bucket,
+            execution_s3_bucket=execution_s3_bucket,
+            storage=storage,
         )
     else:
-        raise DagsterEvaluateConfigValueError(
+        raise check.failed(
             'Shouldn\'t be here: Didn\'t recognize engine type \'{engine}\'. Supported engines '
             'are \'airflow\' and \'lambda\'.'.format(engine=engine)
         )
@@ -237,11 +240,29 @@ class DagmaConfig(namedtuple('_DagmaConfig', 'engine requirements includes')):
         return super(DagmaConfig, cls).__new__(cls, engine, requirements, includes)
 
 
+class DagmaRequirementsConfig(list):
+    def __new__(cls, items):
+        items = check.opt_list_param(items, 'items', of_type=str)
+
+        parse_requirements('\n'.join(items))
+        return super(DagmaRequirementsConfig, cls).__new__(cls, items)
+
+
 def construct_dagma_config(config_value, additional_requirements, additional_includes):
+    additional_requirements = check.opt_list_param(
+        additional_requirements, 'additional_requirements', of_type=str
+    )
+    additional_includes = check.opt_list_param(
+        additional_includes, 'additional_includes', of_type=str
+    )
+
+    requirements = config_value.get('requirements', [])
+    includes = config_value.get('includes', [])
+
     return DagmaConfig(
         engine=construct_engine_config(config_value['engine']),
-        requirements=RequirementsConfig(config_value['requirements'] + additional_requirements),
-        includes=construct_includes(config_value['includes'], additional_includes),
+        requirements=DagmaRequirementsConfig(requirements + additional_requirements),
+        includes=construct_includes(includes, additional_includes),
     )
 
 

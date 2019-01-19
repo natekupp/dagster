@@ -4,10 +4,10 @@
 class Storage(object):
     """S3 backend for storage."""
 
-    def __init__(self, config):
-        self.s3_bucket = config['s3_bucket']
-        self.sessionmaker = config['sessionmaker']
-        self.put_object_kwargs = config['put_object_kwargs']
+    def __init__(self, sessionmaker, s3_bucket, put_object_kwargs):
+        self.s3_bucket = s3_bucket
+        self.sessionmaker = sessionmaker
+        self.put_object_kwargs = put_object_kwargs
 
     @property
     def session(self):
