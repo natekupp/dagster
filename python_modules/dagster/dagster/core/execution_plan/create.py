@@ -141,9 +141,6 @@ def create_subplan_for_output(execution_info, solid, solid_transform_step, outpu
     return decorate_with_output_materializations(execution_info, solid, output_def, subplan)
 
 
-from .objects import ExecutionStep
-
-
 class FanoutExecutionStep(ExecutionStep):
     pass
 
@@ -176,7 +173,7 @@ def _execute_fanin(execution_info, context, step, inputs):
     check.dict_param(inputs, 'inputs', key_type=str)
 
     # This is the sequence that comes from the previous *fanout* step
-    in_sequence = inputs[SEQUENCE_INPUT]
+    _in_sequence = inputs[SEQUENCE_INPUT]
 
     ## do stuff
 
