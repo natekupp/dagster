@@ -57,3 +57,8 @@ with a `~/.pypirc` file in the following format:
     repository: https://upload.pypi.org/legacy/
     username: <username>
     password: <password>
+
+### ReadTheDocs notes
+
+ReadTheDocs are developing their API v3, which should have write access. See:
+https://github.com/rtfd/readthedocs.org/issues/4286
