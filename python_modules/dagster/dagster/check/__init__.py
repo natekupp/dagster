@@ -276,6 +276,14 @@ def dict_param(obj, param_name, key_type=None, value_type=None):
     return _check_key_value_types(obj, key_type, value_type)
 
 
+def opt_type_param(obj, param_name):
+    if obj is None:
+        return None
+    if not isinstance(obj, type):
+        raise_with_traceback(_not_type_param_subclass_mismatch_exception(obj, param_name))
+    return obj
+
+
 def type_param(obj, param_name):
     if not isinstance(obj, type):
         raise_with_traceback(_not_type_param_subclass_mismatch_exception(obj, param_name))

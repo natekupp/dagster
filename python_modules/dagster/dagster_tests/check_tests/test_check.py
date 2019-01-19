@@ -584,6 +584,27 @@ def test_type_param():
         check.type_param(Bar(), 'foo')
 
 
+def test_opt_type_param():
+    class Bar(object):
+        pass
+
+    assert check.opt_type_param(int, 'foo')
+    assert check.opt_type_param(Bar, 'foo')
+    assert check.opt_type_param(None, 'foo') is None
+
+    with pytest.raises(CheckError):
+        check.opt_type_param(check, 'foo')
+
+    with pytest.raises(CheckError):
+        check.opt_type_param(234, 'foo')
+
+    with pytest.raises(CheckError):
+        check.opt_type_param('bar', 'foo')
+
+    with pytest.raises(CheckError):
+        check.opt_type_param(Bar(), 'foo')
+
+
 def test_subclass_param():
     class Super(object):
         pass
