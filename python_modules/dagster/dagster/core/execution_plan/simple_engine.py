@@ -62,11 +62,10 @@ def execute_plan_core(context, execution_plan):
             expected_outputs = [ni.prev_output_handle for ni in step.step_inputs]
 
             context.debug(
-                'Not all inputs covered for {step}. Not executing.'.format(step=step.key)
-                + '\nKeys in result: {result_keys}.'.format(result_keys=result_keys)
-                + '\nOutputs need for inputs {expected_outputs}'.format(
-                    expected_outputs=expected_outputs
-                )
+                (
+                    'Not all inputs covered for {step}. Not executing. Keys in '
+                    'result: {result_keys}. Outputs need for inputs {expected_outputs}.'
+                ).format(step=step.key, result_keys=result_keys, expected_outputs=expected_outputs)
             )
             continue
 
@@ -76,12 +75,20 @@ def execute_plan_core(context, execution_plan):
             input_value = intermediate_results[prev_output_handle].success_data.value
             input_values[step_input.name] = input_value
 
-        for result in execute_step(step, context, input_values):
+        step_result = execute_step(step, context, input_values)
+        for result in step_result.step_output_fn():
             check.invariant(isinstance(result, StepOutputResult))
             yield result
             if result.success:
                 output_handle = StepOutputHandle(step, result.success_data.output_name)
                 intermediate_results[output_handle] = result
+
+        # TODO here. determine next step
+
+
+class StepResult:
+    def __init__(self, step_output_fn):
+        self.step_output_fn = step_output_fn
 
 
 def execute_step(step, context, inputs):
@@ -89,22 +96,25 @@ def execute_step(step, context, inputs):
     check.inst_param(context, 'context', RuntimeExecutionContext)
     check.dict_param(inputs, 'inputs', key_type=str)
 
-    try:
-        for step_result in _execute_step_core_loop(step, context, inputs):
-            context.info(
-                'Step {step} emitted {value} for output {output}'.format(
-                    step=step.key,
-                    value=repr(step_result.success_data.value),
-                    output=step_result.success_data.output_name,
+    def _step_output_fn():
+        try:
+            for step_result in _execute_step_core_loop(step, context, inputs):
+                context.info(
+                    'Step {step} emitted {value} for output {output}'.format(
+                        step=step.key,
+                        value=repr(step_result.success_data.value),
+                        output=step_result.success_data.output_name,
+                    )
                 )
+                yield step_result
+        except DagsterError as dagster_error:
+            context.error(str(dagster_error))
+            yield StepOutputResult.failure_result(
+                step=step, tag=step.tag, failure_data=StepFailureData(dagster_error=dagster_error)
             )
-            yield step_result
-    except DagsterError as dagster_error:
-        context.error(str(dagster_error))
-        yield StepOutputResult.failure_result(
-            step=step, tag=step.tag, failure_data=StepFailureData(dagster_error=dagster_error)
-        )
-        return
+            return
+
+    return StepResult(step_output_fn=_step_output_fn)
 
 
 def _error_check_results(step, results):

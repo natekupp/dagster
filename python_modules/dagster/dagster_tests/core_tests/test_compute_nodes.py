@@ -49,7 +49,9 @@ def test_compute_noop_node_core():
 
     assert len(plan.steps) == 1
 
-    outputs = list(execute_step(plan.steps[0], create_test_runtime_execution_context(), {}))
+    outputs = list(
+        execute_step(plan.steps[0], create_test_runtime_execution_context(), {}).step_output_fn()
+    )
 
     assert outputs[0].success_data.value == 'foo'
 
@@ -60,7 +62,9 @@ def test_compute_noop_node():
     plan = create_execution_plan(pipeline)
 
     assert len(plan.steps) == 1
-    outputs = list(execute_step(plan.steps[0], create_test_runtime_execution_context(), {}))
+    outputs = list(
+        execute_step(plan.steps[0], create_test_runtime_execution_context(), {}).step_output_fn()
+    )
 
     assert outputs[0].success_data.value == 'foo'
 

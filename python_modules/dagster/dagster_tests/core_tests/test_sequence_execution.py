@@ -14,11 +14,14 @@ from dagster import (
     solid,
 )
 
-from dagster.core.definitions.dependency import SequenceDependencyDefinition
+from dagster.core.definitions.dependency import (
+    FanoutDependencyDefinition,
+    FaninDependencyDefinition,
+)
 
 
 @dagster_type
-class Sequence:
+class Sequence(object):
     def __init__(self, iterable):
         self._iterable = iterable
 
@@ -69,13 +72,21 @@ def test_basic_fan_out():
         return Sequence(_produce_things)
 
     @solid(inputs=[InputDefinition('num', Int)])
-    def consume_int(_info, num):
-        print(num)
+    def add_one(_info, num):
+        return num + 1
+
+    @solid(inputs=[InputDefinition('seq', Sequence)])
+    def consume_sequence(_info, seq):
+        for val in seq.items():
+            print(val)
 
     pipeline_def = PipelineDefinition(
         name='sequence_pipeline',
-        solids=[produce_sequence, consume_int],
-        dependencies={'consume_int': {'num': SequenceDependencyDefinition('produce_sequence')}},
+        solids=[produce_sequence, add_one, consume_sequence],
+        dependencies={
+            'add_one': {'num': FanoutDependencyDefinition('produce_sequence')},
+            'consume_sequence': {'seq': FaninDependencyDefinition('add_one')},
+        },
     )
 
     result = execute_pipeline(pipeline_def)

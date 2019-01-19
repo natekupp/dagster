@@ -26,6 +26,7 @@ from .objects import (
     ExecutionPlanSubsetInfo,
     StepInput,
     StepOutputHandle,
+    StepOutput,
     StepTag,
 )
 
@@ -140,6 +141,40 @@ def create_subplan_for_output(execution_info, solid, solid_transform_step, outpu
     return decorate_with_output_materializations(execution_info, solid, output_def, subplan)
 
 
+from .objects import ExecutionStep
+
+
+class FanoutExecutionStep(ExecutionStep):
+    pass
+
+
+from dagster.core.types.runtime import Any
+from dagster.core.execution_context import RuntimeExecutionContext
+
+SEQUENCE_INPUT = 'sequence_input'
+ITEM_OUTPUT = 'item_output'
+
+
+def _execute_fanout(execution_info, context, step, inputs):
+    check.inst_param(execution_info, 'execution_info', ExecutionPlanInfo)
+    check.inst_param(context, 'context', RuntimeExecutionContext)
+    check.inst_param(step, 'step', ExecutionStep)
+    check.dict_param(inputs, 'inputs', key_type=str)
+
+
+def create_fanout_execution_step(execution_info, solid, input_def, prev_output_handle):
+    return FanoutExecutionStep(
+        key='{solid.name}.{input_def.name}.fanout'.format(solid=solid, input_def=input_def),
+        step_inputs=[StepInput(SEQUENCE_INPUT, Any, prev_output_handle)],  # Sequence<T>
+        step_outputs=[StepOutput(ITEM_OUTPUT, Any)],  # T
+        compute_fn=lambda context, step, inputs: _execute_fanout(
+            execution_info, context, step, inputs
+        ),
+        tag=StepTag.FANOUT,
+        solid=solid,
+    )
+
+
 def get_input_source_step_handle(execution_info, state, solid, input_def):
     check.inst_param(execution_info, 'execution_info', ExecutionPlanInfo)
     check.inst_param(state, 'state', StepBuilderState)
@@ -156,8 +191,10 @@ def get_input_source_step_handle(execution_info, state, solid, input_def):
         state.steps.append(input_thunk_output_handle.step)
         return input_thunk_output_handle
     elif dependency_structure.has_dep(input_handle):
-        if dependency_structure.is_seq_dep(input_handle):
-            check.not_implemented('not yet')
+        if dependency_structure.is_fanout_dep(input_handle):
+            check.not_implemented('fanout not yet')
+        elif dependency_structure.is_fanin_dep(input_handle):
+            check.not_implemented('fanin not yet')
         else:
             solid_output_handle = dependency_structure.get_dep(input_handle)
             return state.step_output_map[solid_output_handle]

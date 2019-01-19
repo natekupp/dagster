@@ -200,10 +200,15 @@ class DependencyStructure(object):
         check.inst_param(solid_input_handle, 'solid_input_handle', SolidInputHandle)
         return solid_input_handle in self._handle_dict
 
-    def is_seq_dep(self, solid_input_handle):
+    def is_fanout_dep(self, solid_input_handle):
         return self._dep_dict[solid_input_handle.solid.name][
             solid_input_handle.input_def.name
-        ].is_seq
+        ].is_fanout
+
+    def is_fanin_dep(self, solid_input_handle):
+        return self._dep_dict[solid_input_handle.solid.name][
+            solid_input_handle.input_def.name
+        ].is_fanin
 
     def deps_of_solid(self, solid_name):
         check.str_param(solid_name, 'solid_name')
@@ -263,11 +268,21 @@ class DependencyDefinition(namedtuple('_DependencyDefinition', 'solid output des
         )
 
     @property
-    def is_seq(self):
+    def is_fanout(self):
+        return False
+
+    @property
+    def is_fanin(self):
         return False
 
 
-class SequenceDependencyDefinition(DependencyDefinition):
+class FanoutDependencyDefinition(DependencyDefinition):
     @property
-    def is_seq(self):
+    def is_fanout(self):
+        return True
+
+
+class FaninDependencyDefinition(DependencyDefinition):
+    @property
+    def is_fanin(self):
         return True
