@@ -24,7 +24,7 @@ from dagster.core.execution_context import RuntimeExecutionContext
 from .objects import (
     ExecutionPlan,
     ExecutionStep,
-    StepResult,
+    StepOutputResult,
     StepOutputHandle,
     StepSuccessData,
     StepFailureData,
@@ -48,7 +48,15 @@ def execute_plan_core(context, execution_plan):
         'Entering execute_steps loop. Order: {order}'.format(order=[step.key for step in steps])
     )
 
-    for step in steps:
+    i_step = 0
+
+    while True:
+
+        if i_step >= len(steps):
+            return
+        step = steps[i_step]
+        i_step += 1
+
         if not _all_inputs_covered(step, intermediate_results):
             result_keys = set(intermediate_results.keys())
             expected_outputs = [ni.prev_output_handle for ni in step.step_inputs]
@@ -69,7 +77,7 @@ def execute_plan_core(context, execution_plan):
             input_values[step_input.name] = input_value
 
         for result in execute_step(step, context, input_values):
-            check.invariant(isinstance(result, StepResult))
+            check.invariant(isinstance(result, StepOutputResult))
             yield result
             if result.success:
                 output_handle = StepOutputHandle(step, result.success_data.output_name)
@@ -82,7 +90,7 @@ def execute_step(step, context, inputs):
     check.dict_param(inputs, 'inputs', key_type=str)
 
     try:
-        for step_result in _execute_steps_core_loop(step, context, inputs):
+        for step_result in _execute_step_core_loop(step, context, inputs):
             context.info(
                 'Step {step} emitted {value} for output {output}'.format(
                     step=step.key,
@@ -93,7 +101,7 @@ def execute_step(step, context, inputs):
             yield step_result
     except DagsterError as dagster_error:
         context.error(str(dagster_error))
-        yield StepResult.failure_result(
+        yield StepOutputResult.failure_result(
             step=step, tag=step.tag, failure_data=StepFailureData(dagster_error=dagster_error)
         )
         return
@@ -123,19 +131,19 @@ def _error_check_results(step, results):
             )
 
         seen_outputs.add(result.output_name)
+        yield result
 
 
-def _execute_steps_core_loop(step, context, inputs):
+def _execute_step_core_loop(step, context, inputs):
     evaluated_inputs = {}
     # do runtime type checks of inputs versus step inputs
     for input_name, input_value in inputs.items():
         evaluated_inputs[input_name] = _get_evaluated_input(step, input_name, input_value)
 
-    results = _compute_result_list(step, context, evaluated_inputs)
+    results = _do_compute(step, context, evaluated_inputs)
 
-    _error_check_results(step, results)
-
-    return [_create_step_result(step, result) for result in results]
+    for result in _error_check_results(step, results):
+        yield _create_step_result(step, result)
 
 
 def _create_step_result(step, result):
@@ -153,7 +161,7 @@ def _create_step_result(step, result):
             )
         )
 
-    return StepResult.success_result(
+    return StepOutputResult.success_result(
         step=step,
         tag=step.tag,
         success_data=StepSuccessData(output_name=result.output_name, value=coerced_value),
@@ -179,7 +187,7 @@ def _get_evaluated_input(step, input_name, input_value):
         )
 
 
-def _compute_result_list(step, context, evaluated_inputs):
+def _do_compute(step, context, evaluated_inputs):
     error_str = 'Error occured during step {key}'.format(key=step.key)
 
     def_name = step.solid.definition.name
@@ -192,9 +200,8 @@ def _compute_result_list(step, context, evaluated_inputs):
                 check.invariant(not step.step_outputs)
                 return
 
-            results = list(gen)
-
-        return results
+            for result in gen:
+                yield result
 
 
 @contextmanager

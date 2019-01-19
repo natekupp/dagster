@@ -156,8 +156,11 @@ def get_input_source_step_handle(execution_info, state, solid, input_def):
         state.steps.append(input_thunk_output_handle.step)
         return input_thunk_output_handle
     elif dependency_structure.has_dep(input_handle):
-        solid_output_handle = dependency_structure.get_dep(input_handle)
-        return state.step_output_map[solid_output_handle]
+        if dependency_structure.is_seq_dep(input_handle):
+            check.not_implemented('not yet')
+        else:
+            solid_output_handle = dependency_structure.get_dep(input_handle)
+            return state.step_output_map[solid_output_handle]
     else:
         raise DagsterInvariantViolationError(
             (

@@ -51,10 +51,12 @@ class StepFailureData(namedtuple('_StepFailureData', 'dagster_error')):
         )
 
 
-class StepResult(namedtuple('_StepResult', 'success step tag success_data failure_data')):
+class StepOutputResult(
+    namedtuple('_StepOutputResult', 'success step tag success_data failure_data')
+):
     @staticmethod
     def success_result(step, tag, success_data):
-        return StepResult(
+        return StepOutputResult(
             success=True,
             step=check.inst_param(step, 'step', ExecutionStep),
             tag=check.inst_param(tag, 'tag', StepTag),
@@ -64,7 +66,7 @@ class StepResult(namedtuple('_StepResult', 'success step tag success_data failur
 
     @staticmethod
     def failure_result(step, tag, failure_data):
-        return StepResult(
+        return StepOutputResult(
             success=False,
             step=check.inst_param(step, 'step', ExecutionStep),
             tag=check.inst_param(tag, 'tag', StepTag),

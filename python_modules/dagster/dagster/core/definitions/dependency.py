@@ -190,14 +190,20 @@ def _create_handle_dict(solid_dict, dep_dict):
 class DependencyStructure(object):
     @staticmethod
     def from_definitions(solids, dep_dict):
-        return DependencyStructure(_create_handle_dict(solids, dep_dict))
+        return DependencyStructure(dep_dict, _create_handle_dict(solids, dep_dict))
 
-    def __init__(self, handle_dict):
+    def __init__(self, dep_dict, handle_dict):
+        self._dep_dict = dep_dict
         self._handle_dict = check.inst_param(handle_dict, 'handle_dict', InputToOutputHandleDict)
 
     def has_dep(self, solid_input_handle):
         check.inst_param(solid_input_handle, 'solid_input_handle', SolidInputHandle)
         return solid_input_handle in self._handle_dict
+
+    def is_seq_dep(self, solid_input_handle):
+        return self._dep_dict[solid_input_handle.solid.name][
+            solid_input_handle.input_def.name
+        ].is_seq
 
     def deps_of_solid(self, solid_name):
         check.str_param(solid_name, 'solid_name')
@@ -255,3 +261,13 @@ class DependencyDefinition(namedtuple('_DependencyDefinition', 'solid output des
             check.str_param(output, 'output'),
             check.opt_str_param(description, 'description'),
         )
+
+    @property
+    def is_seq(self):
+        return False
+
+
+class SequenceDependencyDefinition(DependencyDefinition):
+    @property
+    def is_seq(self):
+        return True

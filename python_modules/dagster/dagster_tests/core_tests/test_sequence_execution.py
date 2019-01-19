@@ -5,6 +5,7 @@ from dagster import (
     DagsterInvariantViolationError,
     DependencyDefinition,
     InputDefinition,
+    Int,
     OutputDefinition,
     PipelineDefinition,
     check,
@@ -12,6 +13,8 @@ from dagster import (
     execute_pipeline,
     solid,
 )
+
+from dagster.core.definitions.dependency import SequenceDependencyDefinition
 
 
 @dagster_type
@@ -54,3 +57,26 @@ def test_sequence_pipeline():
 
     assert events == ['enqueue-1', 'dequeue-1', 'enqueue-2', 'dequeue-2']
 
+
+@pytest.mark.skip('for now')
+def test_basic_fan_out():
+    def _produce_things():
+        yield 1
+        yield 2
+
+    @solid(outputs=[OutputDefinition(Sequence)])
+    def produce_sequence(_info):
+        return Sequence(_produce_things)
+
+    @solid(inputs=[InputDefinition('num', Int)])
+    def consume_int(_info, num):
+        print(num)
+
+    pipeline_def = PipelineDefinition(
+        name='sequence_pipeline',
+        solids=[produce_sequence, consume_int],
+        dependencies={'consume_int': {'num': SequenceDependencyDefinition('produce_sequence')}},
+    )
+
+    result = execute_pipeline(pipeline_def)
+    assert result.success

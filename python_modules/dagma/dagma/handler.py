@@ -7,7 +7,7 @@ from io import BytesIO
 
 from dagster import check
 from dagster.core.execution_context import RuntimeExecutionContext
-from dagster.core.execution_plan.objects import StepResult
+from dagster.core.execution_plan.objects import StepOutputResult
 from dagster.core.execution_plan.simple_engine import execute_step
 
 from .serialize import deserialize, serialize
@@ -86,7 +86,7 @@ def aws_lambda_handler(event, _context):
     results = [result for result in execute_step(step, execution_context, input_values)]
 
     for result in results:
-        check.invariant(isinstance(result, StepResult))
+        check.invariant(isinstance(result, StepOutputResult))
         output_name = result.success_data.output_name
         output_handle = (step.key, output_name)
         intermediate_results[output_handle] = (

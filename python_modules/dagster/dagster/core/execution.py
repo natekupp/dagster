@@ -50,7 +50,7 @@ from .execution_plan.objects import (
     ExecutionPlan,
     ExecutionPlanInfo,
     ExecutionPlanSubsetInfo,
-    StepResult,
+    StepOutputResult,
     StepTag,
 )
 
@@ -136,7 +136,7 @@ class SolidExecutionResult(object):
     @staticmethod
     def from_results(context, results):
         check.inst_param(context, 'context', RuntimeExecutionContext)
-        results = check.list_param(results, 'results', StepResult)
+        results = check.list_param(results, 'results', StepOutputResult)
         if results:
             step_results_by_tag = defaultdict(list)
 
