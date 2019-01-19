@@ -85,6 +85,7 @@ class StepTag(Enum):
     MATERIALIZATION_THUNK = 'MATERIALIZATION_THUNK'
     VALUE_THUNK = 'VALUE_THUNK'
     FANOUT = 'FANOUT'
+    FANIN = 'FANIN'
 
 
 class StepInput(namedtuple('_StepInput', 'name runtime_type prev_output_handle')):

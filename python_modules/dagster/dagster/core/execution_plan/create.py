@@ -148,11 +148,18 @@ class FanoutExecutionStep(ExecutionStep):
     pass
 
 
+class FaninExecutionStep(ExecutionStep):
+    pass
+
+
 from dagster.core.types.runtime import Any
 from dagster.core.execution_context import RuntimeExecutionContext
 
 SEQUENCE_INPUT = 'sequence_input'
 ITEM_OUTPUT = 'item_output'
+
+ITEM_INPUT = 'item_input'
+SEQUENCE_OUTPUT = 'sequence_output'
 
 
 def _execute_fanout(execution_info, context, step, inputs):
@@ -160,6 +167,18 @@ def _execute_fanout(execution_info, context, step, inputs):
     check.inst_param(context, 'context', RuntimeExecutionContext)
     check.inst_param(step, 'step', ExecutionStep)
     check.dict_param(inputs, 'inputs', key_type=str)
+
+
+def _execute_fanin(execution_info, context, step, inputs):
+    check.inst_param(execution_info, 'execution_info', ExecutionPlanInfo)
+    check.inst_param(context, 'context', RuntimeExecutionContext)
+    check.inst_param(step, 'step', ExecutionStep)
+    check.dict_param(inputs, 'inputs', key_type=str)
+
+    # This is the sequence that comes from the previous *fanout* step
+    in_sequence = inputs[SEQUENCE_INPUT]
+
+    ## do stuff
 
 
 def create_fanout_execution_step(execution_info, solid, input_def, prev_output_handle):
@@ -171,6 +190,19 @@ def create_fanout_execution_step(execution_info, solid, input_def, prev_output_h
             execution_info, context, step, inputs
         ),
         tag=StepTag.FANOUT,
+        solid=solid,
+    )
+
+
+def create_fanin_execution_step(execution_info, solid, input_def, prev_output_handle):
+    return FaninExecutionStep(
+        key='{solid.name}.{input_def.name}.fanin'.format(solid=solid, input_def=input_def),
+        step_inputs=[StepInput(SEQUENCE_INPUT, Any, prev_output_handle)],  # Sequence<T>
+        step_outputs=[StepOutput(SEQUENCE_OUTPUT, Any)],  # Sequence<T>
+        compute_fn=lambda context, step, inputs: _execute_fanin(
+            execution_info, context, step, inputs
+        ),
+        tag=StepTag.FANIN,
         solid=solid,
     )
 
