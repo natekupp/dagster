@@ -47,7 +47,7 @@ def empty_plan_builder():
     return PlanBuilder(steps=[], step_output_map=StepOutputMap())
 
 
-def create_stack_tracker(pipeline):
+def create_stack_entries(pipeline):
     initial_plan_builder_stack = [empty_plan_builder()]
 
     stack_entries = {}
@@ -58,8 +58,14 @@ def create_stack_tracker(pipeline):
             stack_entries[solid_name] = new_entry
             return
 
-        if not new_entry.plan_builder_stack != stack_entries[solid_name].plan_builder_stack:
+        if len(new_entry.plan_builder_stack) != len(stack_entries[solid_name].plan_builder_stack):
             raise DagsterInvariantViolationError('stack mismatch!')
+
+        for builder_one, builder_two in zip(
+            new_entry.plan_builder_stack, stack_entries[solid_name].plan_builder_stack
+        ):
+            if not builder_one is builder_two:
+                raise DagsterInvariantViolationError('stack mismatch!')
 
     dep_structure = pipeline.dependency_structure
 
@@ -86,13 +92,15 @@ def create_stack_tracker(pipeline):
             elif dep_structure.is_fanin_dep(input_handle):
                 _set_stack_entry(SolidStackEntry(solid, prev_stack_entry.plan_builder_stack[:-1]))
             else:
-                _set_stack_entry(prev_stack_entry.plan_builder_stack)
+                _set_stack_entry(SolidStackEntry(solid, prev_stack_entry.plan_builder_stack))
 
     return stack_entries
 
 
 def create_execution_plan_core(context, pipeline, environment):
-    execution_info = CreateExecutionPlanInfo(context, pipeline, environment)
+    execution_info = CreateExecutionPlanInfo(
+        context, pipeline, environment, create_stack_entries(pipeline)
+    )
 
     plan_builder = PlanBuilder(steps=[], step_output_map=StepOutputMap())
 

@@ -16,7 +16,7 @@ from dagster.core.definitions.dependency import (
     FaninDependencyDefinition,
 )
 
-from dagster.core.execution_plan.create import create_stack_tracker
+from dagster.core.execution_plan.create import create_stack_entries
 
 
 @dagster_type
@@ -106,7 +106,7 @@ def test_basic_fanin_fanout_dep_structure():
 
 def test_stack_builder():
     pipeline_def = define_basic_fanin_fanout_pipeline()
-    stack_entries = create_stack_tracker(pipeline_def)
+    stack_entries = create_stack_entries(pipeline_def)
     assert len(stack_entries) == 3
     assert len(stack_entries['produce_sequence'].plan_builder_stack) == 1
     assert len(stack_entries['add_one'].plan_builder_stack) == 2

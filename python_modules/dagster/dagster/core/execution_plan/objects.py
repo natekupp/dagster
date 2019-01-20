@@ -209,13 +209,18 @@ class ExecutionPlan(object):
             yield self.step_dict[step_key]
 
 
-class CreateExecutionPlanInfo(namedtuple('_ExecutionPlanInfo', 'context pipeline environment')):
-    def __new__(cls, context, pipeline, environment):
+class CreateExecutionPlanInfo(
+    namedtuple('_ExecutionPlanInfo', 'context pipeline environment stack_entries')
+):
+    def __new__(cls, context, pipeline, environment, stack_entries):
         return super(CreateExecutionPlanInfo, cls).__new__(
             cls,
             check.inst_param(context, 'context', RuntimeExecutionContext),
             check.inst_param(pipeline, 'pipeline', PipelineDefinition),
             check.inst_param(environment, 'environment', EnvironmentConfig),
+            check.dict_param(
+                stack_entries, 'stack_entries', key_type=str, value_type=SolidStackEntry
+            ),
         )
 
 
