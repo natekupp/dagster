@@ -243,7 +243,13 @@ class ExecutionPlanSubsetInfo(namedtuple('_ExecutionPlanSubsetInfo', 'subset inp
 # step_output_map maps logical solid outputs (solid_name, output_name) to particular
 # step outputs. This covers the case where a solid maps to multiple steps
 # and one wants to be able to attach to the logical output of a solid during execution
-PlanBuilder = namedtuple('PlanBuilder', 'steps step_output_map')
+class PlanBuilder:
+    def __init__(self, steps, step_output_map):
+        self.steps = steps
+        self.step_output_map = step_output_map
+
+
+# PlanBuilder = namedtuple('PlanBuilder', 'steps step_output_map')
 
 
 class StepOutputMap(dict):

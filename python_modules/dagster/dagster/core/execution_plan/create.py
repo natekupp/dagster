@@ -99,34 +99,69 @@ def create_stack_tracker(pipeline, topological_solids):
     return StackTracker(root_builder, stack_entries)
 
 
+def get_fanout_input(execution_info, solid):
+    dep_structure = execution_info.pipeline.dependency_structure
+
+    def _is_fanin_inp(input_def):
+        inp_handle = solid.input_handle(input_def.name)
+        return dep_structure.has_dep(inp_handle) and dep_structure.is_fanin_dep(inp_handle)
+
+    fanout_inputs = [input_def for input_def in solid.input_defs if _is_fanin_inp(input_def)]
+
+    if len(fanout_inputs) > 1:
+        raise DagsterInvariantViolationError('Cannot have more than one fanout input per solid')
+
+    return fanout_inputs[0] if fanout_inputs else None
+
+
+def is_fanout_composite_solid(execution_info, solid):
+    return bool(get_fanout_input(execution_info, solid))
+
+
 def create_execution_plan_core(context, pipeline, environment):
     topological_solids = solids_in_topological_order(pipeline)
+
+    if not topological_solids:
+        return create_execution_plan_from_steps([])
+
     execution_info = CreateExecutionPlanInfo(
         context, pipeline, environment, create_stack_tracker(pipeline, topological_solids)
     )
 
+    builder_stack = []
+    topological_solids_by_builder = {}
     for solid in topological_solids:
+        stack_entry = execution_info.stack_tracker.stack_entries[solid.name]
+        current_builder = stack_entry.plan_builder_stack[-1]
+        if current_builder not in topological_solids_by_builder:
+            topological_solids_by_builder[current_builder] = [solid]
+            builder_stack.append(current_builder)
+        else:
+            topological_solids_by_builder[current_builder].append(solid)
 
-        plan_builder = execution_info.builder_for_solid(solid)
+    plans = []
+    for plan_builder in reversed(builder_stack):
+        for solid in topological_solids_by_builder[plan_builder]:
+            step_inputs = create_step_inputs(execution_info, solid)
 
-        step_inputs = create_step_inputs(execution_info, solid)
-
-        solid_transform_step = create_transform_step(
-            execution_info, solid, step_inputs, get_solid_user_config(execution_info, solid)
-        )
-
-        plan_builder.steps.append(solid_transform_step)
-
-        for output_def in solid.definition.output_defs:
-            subplan = create_value_subplan_for_output(
-                execution_info, solid, solid_transform_step, output_def
+            solid_transform_step = create_transform_step(
+                execution_info, solid, step_inputs, get_solid_user_config(execution_info, solid)
             )
-            plan_builder.steps.extend(subplan.steps)
 
-            output_handle = solid.output_handle(output_def.name)
-            plan_builder.step_output_map[output_handle] = subplan.terminal_step_output_handle
+            plan_builder.steps.append(solid_transform_step)
 
-    return create_execution_plan_from_steps(execution_info.stack_tracker.root_builder.steps)
+            for output_def in solid.definition.output_defs:
+                subplan = create_value_subplan_for_output(
+                    execution_info, solid, solid_transform_step, output_def
+                )
+                plan_builder.steps.extend(subplan.steps)
+
+                output_handle = solid.output_handle(output_def.name)
+                plan_builder.step_output_map[output_handle] = subplan.terminal_step_output_handle
+
+            plans.append(create_execution_plan_from_steps(plan_builder.steps))
+
+    return plans[-1]
 
 
 def create_execution_plan_from_steps(steps):
