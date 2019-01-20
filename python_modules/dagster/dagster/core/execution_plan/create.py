@@ -45,7 +45,7 @@ def get_solid_user_config(execution_info, pipeline_solid):
 
 
 def empty_plan_builder():
-    return PlanBuilder(steps=[], step_output_map=StepOutputMap())
+    return PlanBuilder(steps=[])
 
 
 def create_stack_tracker(pipeline, topological_solids):
@@ -122,7 +122,7 @@ def create_execution_plan_core(context, pipeline, environment):
     topological_solids = solids_in_topological_order(pipeline)
 
     if not topological_solids:
-        return create_execution_plan_from_steps([])
+        return create_execution_plan_from_steps(empty_plan_builder())
 
     execution_info = CreateExecutionPlanInfo(
         context, pipeline, environment, create_stack_tracker(pipeline, topological_solids)
@@ -159,13 +159,14 @@ def create_execution_plan_core(context, pipeline, environment):
                 output_handle = solid.output_handle(output_def.name)
                 plan_builder.step_output_map[output_handle] = subplan.terminal_step_output_handle
 
-            plans.append(create_execution_plan_from_steps(plan_builder.steps))
+            plans.append(create_execution_plan_from_steps(plan_builder))
 
     return plans[-1]
 
 
-def create_execution_plan_from_steps(steps):
-    check.list_param(steps, 'steps', of_type=ExecutionStep)
+def create_execution_plan_from_steps(plan_builder):
+    check.inst_param(plan_builder, 'plan_builder', PlanBuilder)
+    steps = plan_builder.steps
 
     step_dict = {step.key: step for step in steps}
     deps = {step.key: set() for step in steps}
@@ -182,7 +183,9 @@ def create_execution_plan_from_steps(steps):
         seen_keys.add(step.key)
 
         for step_input in step.step_inputs:
-            deps[step.key].add(step_input.prev_output_handle.step.key)
+            # For now. Should probably not checkin
+            if not step_input.prev_output_handle is SUBPLAN_BEGIN_SENTINEL:
+                deps[step.key].add(step_input.prev_output_handle.step.key)
 
     return ExecutionPlan(step_dict, deps)
 
@@ -241,7 +244,8 @@ def get_input_source_step_handle(execution_info, solid, input_def):
         if dependency_structure.is_fanin_dep(input_handle):
             check.not_implemented('fanin')
         elif dependency_structure.is_fanout_dep(input_handle):
-            check.not_implemented('fanout')
+            # This is going to be the entry point into the subplan
+            return SUBPLAN_BEGIN_SENTINEL
         else:
             solid_output_handle = dependency_structure.get_dep(input_handle)
             return plan_builder.step_output_map[solid_output_handle]
@@ -257,6 +261,9 @@ def get_input_source_step_handle(execution_info, solid, input_def):
                 input_name=input_def.name,
             )
         )
+
+
+SUBPLAN_BEGIN_SENTINEL = StepOutputHandle(None, 'SUBPLAN_ENTRY')
 
 
 def create_step_inputs(execution_info, solid):
@@ -298,7 +305,7 @@ def create_subplan(execution_plan, subset_info):
         else:
             steps.extend(_create_new_steps_for_input(step, subset_info))
 
-    return create_execution_plan_from_steps(steps)
+    return create_execution_plan_from_steps(PlanBuilder(steps))
 
 
 def _create_new_steps_for_input(step, subset_info):

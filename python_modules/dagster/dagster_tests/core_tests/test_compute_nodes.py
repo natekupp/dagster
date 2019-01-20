@@ -15,6 +15,7 @@ from dagster.core.execution import create_execution_plan
 from dagster.core.execution_plan.create import (
     create_execution_plan_core,
     create_execution_plan_from_steps,
+    PlanBuilder,
 )
 
 from dagster.core.execution_plan.objects import ExecutionStep, StepTag
@@ -71,12 +72,14 @@ def test_duplicate_steps():
 
     with pytest.raises(check.CheckError):
         create_execution_plan_from_steps(
-            [
-                ExecutionStep(
-                    'same_name', [], [], lambda *args, **kwargs: None, StepTag.TRANSFORM, foo
-                ),
-                ExecutionStep(
-                    'same_name', [], [], lambda *args, **kwargs: None, StepTag.TRANSFORM, foo
-                ),
-            ]
+            PlanBuilder(
+                [
+                    ExecutionStep(
+                        'same_name', [], [], lambda *args, **kwargs: None, StepTag.TRANSFORM, foo
+                    ),
+                    ExecutionStep(
+                        'same_name', [], [], lambda *args, **kwargs: None, StepTag.TRANSFORM, foo
+                    ),
+                ]
+            )
         )

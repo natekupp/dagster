@@ -1,6 +1,7 @@
 from collections import namedtuple
 from enum import Enum
 import toposort
+import uuid
 
 from dagster import check
 from dagster.core.system_config.objects import EnvironmentConfig
@@ -14,7 +15,8 @@ class StepOutputHandle(namedtuple('_StepOutputHandle', 'step output_name')):
     def __new__(cls, step, output_name):
         return super(StepOutputHandle, cls).__new__(
             cls,
-            step=check.inst_param(step, 'step', ExecutionStep),
+            # Optional for now to account for sentinel
+            step=check.opt_inst_param(step, 'step', ExecutionStep),
             output_name=check.str_param(output_name, 'output_name'),
         )
 
@@ -244,12 +246,10 @@ class ExecutionPlanSubsetInfo(namedtuple('_ExecutionPlanSubsetInfo', 'subset inp
 # step outputs. This covers the case where a solid maps to multiple steps
 # and one wants to be able to attach to the logical output of a solid during execution
 class PlanBuilder:
-    def __init__(self, steps, step_output_map):
+    def __init__(self, steps):
+        self.plan_id = str(uuid.uuid4())
         self.steps = steps
-        self.step_output_map = step_output_map
-
-
-# PlanBuilder = namedtuple('PlanBuilder', 'steps step_output_map')
+        self.step_output_map = StepOutputMap()
 
 
 class StepOutputMap(dict):

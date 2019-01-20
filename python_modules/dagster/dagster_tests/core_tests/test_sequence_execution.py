@@ -127,7 +127,6 @@ def test_stack_builder():
     )
 
 
-@pytest.mark.skip('for now')
 def test_basic_fan_out():
     pipeline_def = define_basic_fanin_fanout_pipeline()
     result = execute_pipeline(pipeline_def)
