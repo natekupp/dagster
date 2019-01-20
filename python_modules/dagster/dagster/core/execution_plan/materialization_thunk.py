@@ -5,7 +5,7 @@ from dagster.core.definitions import Result, Solid, OutputDefinition
 from dagster.core.types.runtime import RuntimeType
 
 from .objects import (
-    ExecutionPlanInfo,
+    CreateExecutionPlanInfo,
     ExecutionStep,
     ExecutionValueSubPlan,
     StepInput,
@@ -41,7 +41,7 @@ def configs_for_output(solid, solid_config, output_def):
 
 
 def decorate_with_output_materializations(execution_info, solid, output_def, subplan):
-    check.inst_param(execution_info, 'execution_info', ExecutionPlanInfo)
+    check.inst_param(execution_info, 'execution_info', CreateExecutionPlanInfo)
     check.inst_param(solid, 'solid', Solid)
     check.inst_param(output_def, 'output_def', OutputDefinition)
     check.inst_param(subplan, 'subplan', ExecutionValueSubPlan)

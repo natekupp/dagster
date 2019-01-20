@@ -12,7 +12,7 @@ from dagster.core.definitions import (
 from dagster.core.errors import DagsterExpectationFailedError
 
 from .objects import (
-    ExecutionPlanInfo,
+    CreateExecutionPlanInfo,
     ExecutionStep,
     ExecutionValueSubPlan,
     StepInput,
@@ -115,7 +115,7 @@ def create_expectation_step(solid, expectation_def, key, tag, prev_step_output_h
 
 
 def decorate_with_expectations(execution_info, solid, transform_step, output_def):
-    check.inst_param(execution_info, 'execution_info', ExecutionPlanInfo)
+    check.inst_param(execution_info, 'execution_info', CreateExecutionPlanInfo)
     check.inst_param(solid, 'solid', Solid)
     check.inst_param(transform_step, 'transform_step', ExecutionStep)
     check.inst_param(output_def, 'output_def', OutputDefinition)

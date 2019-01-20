@@ -209,9 +209,9 @@ class ExecutionPlan(object):
             yield self.step_dict[step_key]
 
 
-class ExecutionPlanInfo(namedtuple('_ExecutionPlanInfo', 'context pipeline environment')):
+class CreateExecutionPlanInfo(namedtuple('_ExecutionPlanInfo', 'context pipeline environment')):
     def __new__(cls, context, pipeline, environment):
-        return super(ExecutionPlanInfo, cls).__new__(
+        return super(CreateExecutionPlanInfo, cls).__new__(
             cls,
             check.inst_param(context, 'context', RuntimeExecutionContext),
             check.inst_param(pipeline, 'pipeline', PipelineDefinition),

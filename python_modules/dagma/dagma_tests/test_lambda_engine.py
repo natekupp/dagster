@@ -23,7 +23,7 @@ from dagster import (
 )
 from dagster.core.execution import (
     create_execution_plan_core,
-    ExecutionPlanInfo,
+    CreateExecutionPlanInfo,
     create_typed_environment,
     yield_context,
 )
@@ -99,7 +99,7 @@ def run_test_pipeline(pipeline):
     reentrant_info = ReentrantInfo(run_id=str(uuid.uuid4()))
     with yield_context(pipeline, typed_environment, reentrant_info) as context:
         execution_plan = create_execution_plan_core(
-            ExecutionPlanInfo(context, pipeline, typed_environment)
+            CreateExecutionPlanInfo(context, pipeline, typed_environment)
         )
         with context.value('pipeline', pipeline.display_name):
             results = execute_plan(context, execution_plan)

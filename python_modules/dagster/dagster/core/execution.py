@@ -48,7 +48,7 @@ from .execution_plan.create import create_execution_plan_core, create_subplan
 
 from .execution_plan.objects import (
     ExecutionPlan,
-    ExecutionPlanInfo,
+    CreateExecutionPlanInfo,
     ExecutionPlanSubsetInfo,
     StepResult,
     StepTag,
@@ -240,7 +240,7 @@ def create_execution_plan_with_typed_environment(pipeline, typed_environment):
     check.inst_param(typed_environment, 'environment', EnvironmentConfig)
 
     with yield_context(pipeline, typed_environment) as context:
-        return create_execution_plan_core(ExecutionPlanInfo(context, pipeline, typed_environment))
+        return create_execution_plan_core(CreateExecutionPlanInfo(context, pipeline, typed_environment))
 
 
 def get_run_id(reentrant_info):
@@ -402,7 +402,7 @@ def _do_iterate_pipeline(pipeline, context, typed_environment, throw_on_error=Tr
         context.events.pipeline_start()
 
         execution_plan = create_execution_plan_core(
-            ExecutionPlanInfo(context, pipeline, typed_environment)
+            CreateExecutionPlanInfo(context, pipeline, typed_environment)
         )
 
         steps = list(execution_plan.topological_steps())
@@ -519,7 +519,7 @@ def execute_plan(pipeline, execution_plan, environment=None, subset_info=None, r
     with yield_context(pipeline, typed_environment, reentrant_info) as context:
         plan_to_execute = (
             create_subplan(
-                ExecutionPlanInfo(
+                CreateExecutionPlanInfo(
                     context=context, pipeline=pipeline, environment=typed_environment
                 ),
                 execution_plan,

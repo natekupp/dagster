@@ -17,7 +17,7 @@ from .materialization_thunk import decorate_with_output_materializations
 
 from .objects import (
     ExecutionPlan,
-    ExecutionPlanInfo,
+    CreateExecutionPlanInfo,
     ExecutionStep,
     ExecutionValueSubPlan,
     ExecutionPlanSubsetInfo,
@@ -35,7 +35,7 @@ from .utility import create_value_thunk_step
 
 
 def get_solid_user_config(execution_info, pipeline_solid):
-    check.inst_param(execution_info, 'execution_info', ExecutionPlanInfo)
+    check.inst_param(execution_info, 'execution_info', CreateExecutionPlanInfo)
     check.inst_param(pipeline_solid, 'pipeline_solid', Solid)
 
     name = pipeline_solid.name
@@ -95,7 +95,7 @@ def create_stack_tracker(pipeline):
 
 
 def create_execution_plan_core(execution_info):
-    check.inst_param(execution_info, 'execution_info', ExecutionPlanInfo)
+    check.inst_param(execution_info, 'execution_info', CreateExecutionPlanInfo)
 
     plan_builder = PlanBuilder(steps=[], step_output_map=StepOutputMap())
 
@@ -145,7 +145,7 @@ def create_execution_plan_from_steps(steps):
 
 
 def create_value_subplan_for_input(execution_info, solid, prev_step_output_handle, input_def):
-    check.inst_param(execution_info, 'execution_info', ExecutionPlanInfo)
+    check.inst_param(execution_info, 'execution_info', CreateExecutionPlanInfo)
     check.inst_param(solid, 'solid', Solid)
     check.inst_param(prev_step_output_handle, 'prev_step_output_handle', StepOutputHandle)
     check.inst_param(input_def, 'input_def', InputDefinition)
@@ -159,7 +159,7 @@ def create_value_subplan_for_input(execution_info, solid, prev_step_output_handl
 
 
 def create_value_subplan_for_output(execution_info, solid, solid_transform_step, output_def):
-    check.inst_param(execution_info, 'execution_info', ExecutionPlanInfo)
+    check.inst_param(execution_info, 'execution_info', CreateExecutionPlanInfo)
     check.inst_param(solid, 'solid', Solid)
     check.inst_param(solid_transform_step, 'solid_transform_step', ExecutionStep)
     check.inst_param(output_def, 'output_def', OutputDefinition)
@@ -170,7 +170,7 @@ def create_value_subplan_for_output(execution_info, solid, solid_transform_step,
 
 
 def get_input_source_step_handle(execution_info, plan_builder, solid, input_def):
-    check.inst_param(execution_info, 'execution_info', ExecutionPlanInfo)
+    check.inst_param(execution_info, 'execution_info', CreateExecutionPlanInfo)
     check.inst_param(plan_builder, 'plan_builder', PlanBuilder)
     check.inst_param(solid, 'solid', Solid)
     check.inst_param(input_def, 'input_def', InputDefinition)
@@ -207,7 +207,7 @@ def get_input_source_step_handle(execution_info, plan_builder, solid, input_def)
 
 
 def create_step_inputs(info, plan_builder, solid):
-    check.inst_param(info, 'info', ExecutionPlanInfo)
+    check.inst_param(info, 'info', CreateExecutionPlanInfo)
     check.inst_param(plan_builder, 'plan_builder', PlanBuilder)
     check.inst_param(solid, 'solid', Solid)
 
@@ -227,7 +227,7 @@ def create_step_inputs(info, plan_builder, solid):
 
 
 def create_subplan(execution_plan_info, execution_plan, subset_info):
-    check.inst_param(execution_plan_info, 'execution_plan_info', ExecutionPlanInfo)
+    check.inst_param(execution_plan_info, 'execution_plan_info', CreateExecutionPlanInfo)
     check.inst_param(execution_plan, 'execution_plan', ExecutionPlan)
     check.inst_param(subset_info, 'subset_info', ExecutionPlanSubsetInfo)
 

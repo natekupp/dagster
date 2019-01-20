@@ -4,7 +4,7 @@ from dagster.core.definitions import InputDefinition, Result, Solid
 
 from dagster.core.errors import DagsterInvariantViolationError
 
-from .objects import ExecutionPlanInfo, ExecutionStep, StepOutput, StepOutputHandle, StepTag
+from .objects import CreateExecutionPlanInfo, ExecutionStep, StepOutput, StepOutputHandle, StepTag
 
 INPUT_THUNK_OUTPUT = 'input_thunk_output'
 
@@ -27,7 +27,7 @@ def _create_input_thunk_execution_step(solid, input_def, config_value):
 
 
 def create_input_thunk_execution_step(info, solid, input_def, value):
-    check.inst_param(info, 'info', ExecutionPlanInfo)
+    check.inst_param(info, 'info', CreateExecutionPlanInfo)
     check.inst_param(solid, 'solid', Solid)
     check.inst_param(input_def, 'input_def', InputDefinition)
 
