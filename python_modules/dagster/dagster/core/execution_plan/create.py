@@ -12,7 +12,7 @@ from dagster.core.definitions import (
 
 from dagster.core.errors import DagsterInvariantViolationError
 
-from .expectations import create_expectations_subplan, decorate_with_expectations
+from .expectations import create_expectations_value_subplan, decorate_with_expectations
 
 from .input_thunk import create_input_thunk_execution_step
 
@@ -81,7 +81,7 @@ def create_execution_plan_core(execution_info):
         state.steps.append(solid_transform_step)
 
         for output_def in pipeline_solid.definition.output_defs:
-            subplan = create_subplan_for_output(
+            subplan = create_value_subplan_for_output(
                 execution_info, pipeline_solid, solid_transform_step, output_def
             )
             state.steps.extend(subplan.steps)
@@ -115,21 +115,21 @@ def create_execution_plan_from_steps(steps):
     return ExecutionPlan(step_dict, deps)
 
 
-def create_subplan_for_input(execution_info, solid, prev_step_output_handle, input_def):
+def create_value_subplan_for_input(execution_info, solid, prev_step_output_handle, input_def):
     check.inst_param(execution_info, 'execution_info', ExecutionPlanInfo)
     check.inst_param(solid, 'solid', Solid)
     check.inst_param(prev_step_output_handle, 'prev_step_output_handle', StepOutputHandle)
     check.inst_param(input_def, 'input_def', InputDefinition)
 
     if execution_info.environment.expectations.evaluate and input_def.expectations:
-        return create_expectations_subplan(
+        return create_expectations_value_subplan(
             solid, input_def, prev_step_output_handle, tag=StepTag.INPUT_EXPECTATION
         )
     else:
         return ExecutionValueSubPlan.empty(prev_step_output_handle)
 
 
-def create_subplan_for_output(execution_info, solid, solid_transform_step, output_def):
+def create_value_subplan_for_output(execution_info, solid, solid_transform_step, output_def):
     check.inst_param(execution_info, 'execution_info', ExecutionPlanInfo)
     check.inst_param(solid, 'solid', Solid)
     check.inst_param(solid_transform_step, 'solid_transform_step', ExecutionStep)
@@ -156,8 +156,13 @@ def get_input_source_step_handle(execution_info, state, solid, input_def):
         state.steps.append(input_thunk_output_handle.step)
         return input_thunk_output_handle
     elif dependency_structure.has_dep(input_handle):
-        solid_output_handle = dependency_structure.get_dep(input_handle)
-        return state.step_output_map[solid_output_handle]
+        if dependency_structure.is_fanin_dep(input_handle):
+            check.not_implemented('fanin')
+        elif dependency_structure.is_fanout_dep(input_handle):
+            check.not_implemented('fanout')
+        else:
+            solid_output_handle = dependency_structure.get_dep(input_handle)
+            return state.step_output_map[solid_output_handle]
     else:
         raise DagsterInvariantViolationError(
             (
@@ -182,7 +187,7 @@ def create_step_inputs(info, state, solid):
     for input_def in solid.definition.input_defs:
         prev_step_output_handle = get_input_source_step_handle(info, state, solid, input_def)
 
-        subplan = create_subplan_for_input(info, solid, prev_step_output_handle, input_def)
+        subplan = create_value_subplan_for_input(info, solid, prev_step_output_handle, input_def)
 
         state.steps.extend(subplan.steps)
         step_inputs.append(

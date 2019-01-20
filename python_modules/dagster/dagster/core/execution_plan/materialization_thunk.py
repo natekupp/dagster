@@ -13,7 +13,7 @@ from .objects import (
     StepTag,
 )
 
-from .utility import create_joining_subplan
+from .utility import create_joining_value_subplan
 
 MATERIALIZATION_THUNK_INPUT = 'materialization_thunk_input'
 MATERIALIZATION_THUNK_OUTPUT = 'materialization_thunk_output'
@@ -77,7 +77,7 @@ def decorate_with_output_materializations(execution_info, solid, output_def, sub
             )
         )
 
-    return create_joining_subplan(
+    return create_joining_value_subplan(
         solid,
         '{solid}.materialization.output.{output}.join'.format(
             solid=solid.name, output=output_def.name

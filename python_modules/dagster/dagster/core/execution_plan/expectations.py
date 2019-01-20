@@ -21,7 +21,7 @@ from .objects import (
     StepTag,
 )
 
-from .utility import create_joining_subplan
+from .utility import create_joining_value_subplan
 
 EXPECTATION_INPUT = 'expectation_input'
 EXPECTATION_VALUE_OUTPUT = 'expectation_value'
@@ -54,7 +54,7 @@ def _create_expectation_lambda(solid, inout_def, expectation_def, internal_outpu
     return _do_expectation
 
 
-def create_expectations_subplan(solid, inout_def, prev_step_output_handle, tag):
+def create_expectations_value_subplan(solid, inout_def, prev_step_output_handle, tag):
     check.inst_param(solid, 'solid', Solid)
     check.inst_param(inout_def, 'inout_def', (InputDefinition, OutputDefinition))
     check.inst_param(prev_step_output_handle, 'prev_step_output_handle', StepOutputHandle)
@@ -77,7 +77,7 @@ def create_expectations_subplan(solid, inout_def, prev_step_output_handle, tag):
         )
         input_expect_steps.append(expect_step)
 
-    return create_joining_subplan(
+    return create_joining_value_subplan(
         solid,
         '{solid}.{desc_key}.{inout_name}.expectations.join'.format(
             solid=solid.name, desc_key=inout_def.descriptive_key, inout_name=inout_def.name
@@ -121,7 +121,7 @@ def decorate_with_expectations(execution_info, solid, transform_step, output_def
     check.inst_param(output_def, 'output_def', OutputDefinition)
 
     if execution_info.environment.expectations.evaluate and output_def.expectations:
-        return create_expectations_subplan(
+        return create_expectations_value_subplan(
             solid,
             output_def,
             StepOutputHandle(transform_step, output_def.name),

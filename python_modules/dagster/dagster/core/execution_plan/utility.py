@@ -48,7 +48,7 @@ def create_join_step(solid, step_key, prev_steps, prev_output_name):
     )
 
 
-def create_joining_subplan(solid, join_step_key, parallel_steps, parallel_step_output):
+def create_joining_value_subplan(solid, join_step_key, parallel_steps, parallel_step_output):
     '''
     This captures a common pattern of fanning out a single value to N steps,
     where each step has similar structure. The strict requirement here is that each step
