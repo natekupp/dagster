@@ -67,26 +67,23 @@ def create_execution_plan_core(execution_info):
 
     plan_builder = PlanBuilder(steps=[], step_output_map=StepOutputMap())
 
-    for pipeline_solid in solids_in_topological_order(execution_info.pipeline):
+    for solid in solids_in_topological_order(execution_info.pipeline):
 
-        step_inputs = create_step_inputs(execution_info, plan_builder, pipeline_solid)
+        step_inputs = create_step_inputs(execution_info, plan_builder, solid)
 
         solid_transform_step = create_transform_step(
-            execution_info,
-            pipeline_solid,
-            step_inputs,
-            get_solid_user_config(execution_info, pipeline_solid),
+            execution_info, solid, step_inputs, get_solid_user_config(execution_info, solid)
         )
 
         plan_builder.steps.append(solid_transform_step)
 
-        for output_def in pipeline_solid.definition.output_defs:
+        for output_def in solid.definition.output_defs:
             subplan = create_value_subplan_for_output(
-                execution_info, pipeline_solid, solid_transform_step, output_def
+                execution_info, solid, solid_transform_step, output_def
             )
             plan_builder.steps.extend(subplan.steps)
 
-            output_handle = pipeline_solid.output_handle(output_def.name)
+            output_handle = solid.output_handle(output_def.name)
             plan_builder.step_output_map[output_handle] = subplan.terminal_step_output_handle
 
     return create_execution_plan_from_steps(plan_builder.steps)
