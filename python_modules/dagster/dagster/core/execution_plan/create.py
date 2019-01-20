@@ -27,7 +27,6 @@ from .objects import (
     StepTag,
     PlanBuilder,
     StepResult,
-    StepOutputMap,
     SolidStackEntry,
     StackTracker,
     StepSuccessData,
@@ -329,13 +328,13 @@ def create_value_subplan_for_output(execution_info, solid, solid_transform_step,
     return decorate_with_subplan_executors(execution_info, solid, output_def, value_subplan)
 
 
-class CompositeExecutionStep(ExecutionStep):
-    def __new__(cls, **kwargs):
-        return super(CompositeExecutionStep, cls).__new__(cls, **kwargs)
+# class CompositeExecutionStep(ExecutionStep):
+#     def __new__(cls, **kwargs):  # pylint: disable=W0221
+#         return super(CompositeExecutionStep, cls).__new__(cls, **kwargs)
 
 
-def create_fanout_composite_step(execution_info, solid):
-    check.inst_param(execution_info, 'execution_info', CreateExecutionPlanInfo)
+# def create_fanout_composite_step(execution_info, solid):
+#     check.inst_param(execution_info, 'execution_info', CreateExecutionPlanInfo)
 
 
 def get_input_source_step_handle(execution_info, solid, input_def):
