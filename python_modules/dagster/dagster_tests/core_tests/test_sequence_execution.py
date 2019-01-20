@@ -18,17 +18,7 @@ from dagster.core.definitions.dependency import (
     FaninDependencyDefinition,
 )
 
-from dagster.core.execution_plan.create import create_stack_tracker
-
-
-@dagster_type
-class Sequence(object):
-    def __init__(self, iterable):
-        self._iterable = iterable
-
-    def items(self):
-        for item in self._iterable():
-            yield item
+from dagster.core.execution_plan.create import create_stack_tracker, Sequence, StepTag
 
 
 def test_sequence_pipeline():
@@ -127,7 +117,48 @@ def test_stack_builder():
     )
 
 
-def test_basic_fan_out():
-    pipeline_def = define_basic_fanin_fanout_pipeline()
-    result = execute_pipeline(pipeline_def)
-    assert result.success
+from dagster.core.execution import create_execution_plan, execute_plan, create_execution_plan
+
+
+def define_fanout_only_pipeline():
+    def _produce_things():
+        yield 1
+        yield 2
+
+    @solid(outputs=[OutputDefinition(Sequence)])
+    def produce_sequence(_info):
+        return Sequence(_produce_things)
+
+    @solid(inputs=[InputDefinition('num', Int)])
+    def add_one(_info, num):
+        return num + 1
+
+    return PipelineDefinition(
+        name='only_fanout_pipeline',
+        solids=[produce_sequence, add_one],
+        dependencies={'add_one': {'num': FanoutDependencyDefinition('produce_sequence')}},
+    )
+
+
+def test_only_fanout_create_execution_plan():
+    fanout_pipeline = define_fanout_only_pipeline()
+
+    plan = create_execution_plan(fanout_pipeline)
+    assert plan
+
+    assert len(plan.steps) == 2
+    assert plan.steps[0].tag == StepTag.TRANSFORM
+    assert plan.steps[1].tag == StepTag.SUBPLAN_EXECUTOR
+
+    subplan = plan.steps[1].subplan
+    assert len(subplan.steps) == 1
+    assert subplan.steps[0].tag == StepTag.TRANSFORM
+
+
+@pytest.mark.skip('not yet')
+def test_only_fanout_execute_pipeline():
+    fanout_pipeline = define_fanout_only_pipeline()
+    plan = create_execution_plan(fanout_pipeline)
+    results = execute_plan(fanout_pipeline, plan)
+    out_list = list(results[1].success_data.value.items())
+    assert out_list == [2, 3]

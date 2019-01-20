@@ -231,6 +231,11 @@ class DependencyStructure(object):
                 result[output_handle].append(input_handle)
         return result
 
+    def input_handles_depending_on_output(self, solid_output_handle):
+        for input_handle, output_handle in self._handle_dict.items():
+            if output_handle == solid_output_handle:
+                yield input_handle
+
     def get_dep(self, solid_input_handle):
         check.inst_param(solid_input_handle, 'solid_input_handle', SolidInputHandle)
         return self._handle_dict[solid_input_handle]

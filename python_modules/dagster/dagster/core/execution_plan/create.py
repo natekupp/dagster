@@ -23,6 +23,7 @@ from .objects import (
     ExecutionPlanSubsetInfo,
     StepInput,
     StepOutputHandle,
+    StepOutput,
     StepTag,
     PlanBuilder,
     StepOutputMap,
@@ -124,21 +125,29 @@ def create_execution_plan_core(context, pipeline, environment):
     if not topological_solids:
         return create_execution_plan_from_steps(empty_plan_builder())
 
-    execution_info = CreateExecutionPlanInfo(
-        context, pipeline, environment, create_stack_tracker(pipeline, topological_solids)
-    )
-
+    stack_tracker = create_stack_tracker(pipeline, topological_solids)
     builder_stack = []
     topological_solids_by_plan_id = {}
+    solid_to_plan_id = {}
     for solid in topological_solids:
-        stack_entry = execution_info.stack_tracker.stack_entries[solid.name]
+        stack_entry = stack_tracker.stack_entries[solid.name]
         current_builder = stack_entry.plan_builder_stack[-1]
         current_plan_id = current_builder.plan_id
+        solid_to_plan_id[solid.name] = current_plan_id
         if current_plan_id not in topological_solids_by_plan_id:
             topological_solids_by_plan_id[current_plan_id] = [solid]
             builder_stack.append(current_builder)
         else:
             topological_solids_by_plan_id[current_plan_id].append(solid)
+
+    execution_info = CreateExecutionPlanInfo(
+        context,
+        pipeline,
+        environment,
+        stack_tracker,
+        solid_to_plan_id,
+        topological_solids_by_plan_id,
+    )
 
     plans = []
     for plan_builder in reversed(builder_stack):
@@ -157,10 +166,14 @@ def create_execution_plan_core(context, pipeline, environment):
                 )
                 plan_builder.steps.extend(subplan.steps)
 
-                output_handle = solid.output_handle(output_def.name)
-                plan_builder.step_output_map[output_handle] = subplan.terminal_step_output_handle
+                solid_output_handle = solid.output_handle(output_def.name)
+                plan_builder.step_output_map[
+                    solid_output_handle
+                ] = subplan.terminal_step_output_handle
 
-            plans.append(create_execution_plan_from_steps(plan_builder))
+        new_plan = create_execution_plan_from_steps(plan_builder)
+        plans.append(new_plan)
+        execution_info.plans_dict[plan_builder.plan_id] = new_plan
 
     return plans[-1]
 
@@ -205,15 +218,123 @@ def create_value_subplan_for_input(execution_info, solid, prev_step_output_handl
         return ExecutionValueSubPlan.empty(prev_step_output_handle)
 
 
+SUBPLAN_EXECUTOR_SEQUENCE_INPUT = 'sequence_input'
+SUBPLAN_EXECUTOR_SEQUENCE_OUTPUT = 'sequence_output'
+
+from dagster.core.definitions import Result
+from dagster.core.types.decorator import dagster_type
+
+
+@dagster_type
+class Sequence(object):
+    def __init__(self, iterable):
+        self._iterable = iterable
+
+    def items(self):
+        for item in self._iterable():
+            yield item
+
+
+from .simple_engine import execute_plan_core
+
+
+def _create_output_sequence(context, input_sequence, subplan, step_output_handle):
+    def _produce_output_sequence():
+        for item in input_sequence.items():
+
+            intermediate_results = {step_output_handle: item}
+            for inner_result in execute_plan_core(context, subplan, intermediate_results):
+                # will need to check what output this is?
+                # what to do on error?
+                yield inner_result.value
+
+    return Sequence(_produce_output_sequence)
+
+
+def _create_subplan_executor_compute(subplan, step_output_handle):
+    check.inst_param(subplan, 'subplan', ExecutionPlan)
+
+    def _do_subplan_executor_compute(context, _step, inputs):
+        input_sequence = inputs[SUBPLAN_EXECUTOR_SEQUENCE_INPUT]
+
+        def _produce_output_sequence():
+            for item in input_sequence.items():
+
+                intermediate_results = {step_output_handle: item}
+                for inner_result in execute_plan_core(context, subplan, intermediate_results):
+                    # will need to check what output this is?
+                    # what to do on error?
+                    yield inner_result.value
+
+        yield Result(
+            _create_output_sequence(context, input_sequence, subplan, step_output_handle),
+            SUBPLAN_EXECUTOR_SEQUENCE_OUTPUT,
+        )
+
+    return _do_subplan_executor_compute
+
+
+def create_subplan_executor_step(
+    execution_info, solid, output_def, value_subplan, execution_step_input_handle_start
+):
+    subplan_id = execution_info.solid_to_plan_id[execution_step_input_handle_start.solid.name]
+    # One input. Sequence from output
+
+    # check or hardcode this?
+    sequence_type = output_def.runtime_type
+
+    subplan = execution_info.plans_dict[subplan_id]
+
+    return ExecutionStep(
+        key='plan.{}.executor'.format(subplan_id),
+        step_inputs=[
+            StepInput(
+                SUBPLAN_EXECUTOR_SEQUENCE_INPUT,
+                sequence_type,
+                value_subplan.terminal_step_output_handle,
+            )
+        ],
+        step_outputs=[StepOutput(SUBPLAN_EXECUTOR_SEQUENCE_OUTPUT, sequence_type)],
+        compute_fn=_create_subplan_executor_compute(
+            subplan, value_subplan.terminal_step_output_handle
+        ),
+        tag=StepTag.SUBPLAN_EXECUTOR,
+        solid=solid,
+        subplan=subplan,
+    )
+
+
+def decorate_with_subplan_executors(execution_info, solid, output_def, value_subplan):
+    dep_structure = execution_info.pipeline.dependency_structure
+    output_handle = solid.output_handle(output_def.name)
+    subplan_executors = []
+    for input_handle in dep_structure.input_handles_depending_on_output(output_handle):
+        if dep_structure.is_fanout_dep(input_handle):
+            subplan_executor_step = create_subplan_executor_step(
+                execution_info, solid, output_def, value_subplan, input_handle
+            )
+            subplan_executors.append(subplan_executor_step)
+
+    return ExecutionValueSubPlan(
+        value_subplan.steps + subplan_executors, value_subplan.terminal_step_output_handle
+    )
+
+
 def create_value_subplan_for_output(execution_info, solid, solid_transform_step, output_def):
     check.inst_param(execution_info, 'execution_info', CreateExecutionPlanInfo)
     check.inst_param(solid, 'solid', Solid)
     check.inst_param(solid_transform_step, 'solid_transform_step', ExecutionStep)
     check.inst_param(output_def, 'output_def', OutputDefinition)
 
-    subplan = decorate_with_expectations(execution_info, solid, solid_transform_step, output_def)
+    value_subplan = decorate_with_expectations(
+        execution_info, solid, solid_transform_step, output_def
+    )
 
-    return decorate_with_output_materializations(execution_info, solid, output_def, subplan)
+    value_subplan = decorate_with_output_materializations(
+        execution_info, solid, output_def, value_subplan
+    )
+
+    return decorate_with_subplan_executors(execution_info, solid, output_def, value_subplan)
 
 
 class CompositeExecutionStep(ExecutionStep):
@@ -242,13 +363,13 @@ def get_input_source_step_handle(execution_info, solid, input_def):
         plan_builder.steps.append(input_thunk_output_handle.step)
         return input_thunk_output_handle
     elif dependency_structure.has_dep(input_handle):
+        solid_output_handle = dependency_structure.get_dep(input_handle)
         if dependency_structure.is_fanin_dep(input_handle):
             check.not_implemented('fanin')
         elif dependency_structure.is_fanout_dep(input_handle):
             # This is going to be the entry point into the subplan
             return SUBPLAN_BEGIN_SENTINEL
         else:
-            solid_output_handle = dependency_structure.get_dep(input_handle)
             return plan_builder.step_output_map[solid_output_handle]
     else:
         raise DagsterInvariantViolationError(

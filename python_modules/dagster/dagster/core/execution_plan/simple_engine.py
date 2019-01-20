@@ -38,12 +38,13 @@ def _all_inputs_covered(step, results):
     return True
 
 
-def execute_plan_core(context, execution_plan):
+def execute_plan_core(context, execution_plan, intermediate_results=None):
     check.inst_param(context, 'context', RuntimeExecutionContext)
     check.inst_param(execution_plan, 'execution_plan', ExecutionPlan)
     steps = list(execution_plan.topological_steps())
 
-    intermediate_results = {}
+    intermediate_results = check.opt_dict_param(intermediate_results, 'intermediate_results')
+
     context.debug(
         'Entering execute_steps loop. Order: {order}'.format(order=[step.key for step in steps])
     )

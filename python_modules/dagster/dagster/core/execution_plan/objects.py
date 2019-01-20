@@ -84,6 +84,7 @@ class StepTag(Enum):
     INPUT_THUNK = 'INPUT_THUNK'
     MATERIALIZATION_THUNK = 'MATERIALIZATION_THUNK'
     VALUE_THUNK = 'VALUE_THUNK'
+    SUBPLAN_EXECUTOR = 'SUBPLAN_EXECUTOR'
 
 
 class StepInput(namedtuple('_StepInput', 'name runtime_type prev_output_handle')):
@@ -110,10 +111,16 @@ class StepOutput(namedtuple('_StepOutput', 'name runtime_type')):
 class ExecutionStep(
     namedtuple(
         '_ExecutionStep',
-        'key step_inputs step_input_dict step_outputs step_output_dict compute_fn tag solid',
+        (
+            'key step_inputs step_input_dict step_outputs step_output_dict compute_fn tag '
+            'solid subplan'
+        ),
     )
 ):
-    def __new__(cls, key, step_inputs, step_outputs, compute_fn, tag, solid):
+    def __new__(cls, key, step_inputs, step_outputs, compute_fn, tag, solid, subplan=None):
+        if subplan:
+            check.invariant(tag == StepTag.SUBPLAN_EXECUTOR)
+
         return super(ExecutionStep, cls).__new__(
             cls,
             key=check.str_param(key, 'key'),
@@ -124,6 +131,7 @@ class ExecutionStep(
             compute_fn=check.callable_param(compute_fn, 'compute_fn'),
             tag=check.inst_param(tag, 'tag', StepTag),
             solid=check.inst_param(solid, 'solid', Solid),
+            subplan=check.opt_inst_param(subplan, 'subplan', ExecutionPlan),
         )
 
     def __getnewargs__(self):
@@ -212,15 +220,37 @@ class ExecutionPlan(object):
 
 
 class CreateExecutionPlanInfo(
-    namedtuple('_ExecutionPlanInfo', 'context pipeline environment stack_tracker')
+    namedtuple(
+        '_ExecutionPlanInfo',
+        (
+            'context pipeline environment stack_tracker solid_to_plan_id '
+            'topological_solids_by_plan_id plans_dict'
+        ),
+    )
 ):
-    def __new__(cls, context, pipeline, environment, stack_tracker):
+    def __new__(
+        cls,
+        context,
+        pipeline,
+        environment,
+        stack_tracker,
+        solid_to_plan_id,
+        topological_solids_by_plan_id,
+    ):
         return super(CreateExecutionPlanInfo, cls).__new__(
             cls,
             check.inst_param(context, 'context', RuntimeExecutionContext),
             check.inst_param(pipeline, 'pipeline', PipelineDefinition),
             check.inst_param(environment, 'environment', EnvironmentConfig),
             check.inst_param(stack_tracker, 'stack_tracker', StackTracker),
+            check.dict_param(solid_to_plan_id, 'solid_to_plan_id', key_type=str, value_type=str),
+            check.dict_param(
+                topological_solids_by_plan_id,
+                'topological_solids_by_plan_id',
+                key_type=str,
+                value_type=list,
+            ),
+            {},
         )
 
     def builder_for_solid(self, solid):
