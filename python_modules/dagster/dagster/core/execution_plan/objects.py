@@ -4,7 +4,7 @@ import toposort
 
 from dagster import check
 from dagster.core.system_config.objects import EnvironmentConfig
-from dagster.core.definitions import PipelineDefinition, Solid
+from dagster.core.definitions import PipelineDefinition, Solid, SolidOutputHandle
 from dagster.core.errors import DagsterError
 from dagster.core.execution_context import RuntimeExecutionContext
 from dagster.core.types.runtime import RuntimeType
@@ -230,3 +230,25 @@ class ExecutionPlanSubsetInfo(namedtuple('_ExecutionPlanSubsetInfo', 'subset inp
             set(check.list_param(included_steps, 'included_steps', of_type=str)),
             check.opt_dict_param(inputs, 'inputs'),
         )
+
+
+# This is the state that is built up during the execution plan build process.
+# steps is just a list of the steps that have been created
+# step_output_map maps logical solid outputs (solid_name, output_name) to particular
+# step outputs. This covers the case where a solid maps to multiple steps
+# and one wants to be able to attach to the logical output of a solid during execution
+PlanBuilder = namedtuple('PlanBuilder', 'steps step_output_map')
+
+
+class StepOutputMap(dict):
+    def __getitem__(self, key):
+        check.inst_param(key, 'key', SolidOutputHandle)
+        return dict.__getitem__(self, key)
+
+    def __setitem__(self, key, val):
+        check.inst_param(key, 'key', SolidOutputHandle)
+        check.inst_param(val, 'val', StepOutputHandle)
+        return dict.__setitem__(self, key, val)
+
+
+SolidStackEntry = namedtuple('SolidStackEntry', 'solid plan_builder_stack')

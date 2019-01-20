@@ -1,5 +1,3 @@
-from collections import namedtuple
-
 from dagster import check
 
 from dagster.core.definitions import (
@@ -7,7 +5,6 @@ from dagster.core.definitions import (
     InputDefinition,
     OutputDefinition,
     Solid,
-    SolidOutputHandle,
 )
 
 from dagster.core.errors import DagsterInvariantViolationError
@@ -27,6 +24,9 @@ from .objects import (
     StepInput,
     StepOutputHandle,
     StepTag,
+    PlanBuilder,
+    StepOutputMap,
+    SolidStackEntry,
 )
 
 from .transform import create_transform_step
@@ -43,23 +43,55 @@ def get_solid_user_config(execution_info, pipeline_solid):
     return solid_configs[name].config if name in solid_configs else None
 
 
-# This is the state that is built up during the execution plan build process.
-# steps is just a list of the steps that have been created
-# step_output_map maps logical solid outputs (solid_name, output_name) to particular
-# step outputs. This covers the case where a solid maps to multiple steps
-# and one wants to be able to attach to the logical output of a solid during execution
-PlanBuilder = namedtuple('PlanBuilder', 'steps step_output_map')
+def empty_plan_builder():
+    return PlanBuilder(steps=[], step_output_map=StepOutputMap())
 
 
-class StepOutputMap(dict):
-    def __getitem__(self, key):
-        check.inst_param(key, 'key', SolidOutputHandle)
-        return dict.__getitem__(self, key)
+def create_stack_tracker(pipeline):
+    initial_plan_builder_stack = [empty_plan_builder()]
 
-    def __setitem__(self, key, val):
-        check.inst_param(key, 'key', SolidOutputHandle)
-        check.inst_param(val, 'val', StepOutputHandle)
-        return dict.__setitem__(self, key, val)
+    stack_entries = {}
+
+    def _set_stack_entry(stack_entries, new_entry):
+        solid_name = new_entry.solid.name
+        if solid_name not in stack_entries:
+            stack_entries[solid_name] = new_entry
+            return
+
+        if not new_entry.plan_builder_stack != stack_entries[solid_name].plan_builder_stack:
+            raise DagsterInvariantViolationError('stack mismatch!')
+
+    dep_structure = pipeline.dependency_structure
+
+    for solid in solids_in_topological_order(pipeline):
+        if not solid.definition.input_defs:
+            _set_stack_entry(stack_entries, SolidStackEntry(solid, initial_plan_builder_stack))
+            continue
+
+        for input_def in solid.definition.input_defs:
+            input_handle = solid.input_handle(input_def.name)
+            if not dep_structure.has_dep(input_handle):
+                _set_stack_entry(stack_entries, SolidStackEntry(solid, initial_plan_builder_stack))
+                continue
+
+            prev_output_handle = dep_structure.get_dep(input_handle)
+            prev_stack_entry = stack_entries[prev_output_handle.solid.name]
+
+            if dep_structure.is_fanout_dep(input_handle):
+                _set_stack_entry(
+                    stack_entries,
+                    SolidStackEntry(
+                        solid, prev_stack_entry.plan_builder_stack + [empty_plan_builder()]
+                    ),
+                )
+            elif dep_structure.is_fanin_dep(input_handle):
+                _set_stack_entry(
+                    stack_entries, SolidStackEntry(solid, prev_stack_entry.plan_builder_stack[:-1])
+                )
+            else:
+                _set_stack_entry(stack_entries, prev_stack_entry.plan_builder_stack)
+
+    return stack_entries
 
 
 def create_execution_plan_core(execution_info):
