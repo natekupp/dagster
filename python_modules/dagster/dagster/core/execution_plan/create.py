@@ -27,6 +27,7 @@ from .objects import (
     PlanBuilder,
     StepOutputMap,
     SolidStackEntry,
+    StackTracker,
 )
 
 from .transform import create_transform_step
@@ -47,8 +48,9 @@ def empty_plan_builder():
     return PlanBuilder(steps=[], step_output_map=StepOutputMap())
 
 
-def create_stack_entries(pipeline):
-    initial_plan_builder_stack = [empty_plan_builder()]
+def create_stack_tracker(pipeline):
+    root_builder = empty_plan_builder()
+    initial_plan_builder_stack = [root_builder]
 
     stack_entries = {}
 
@@ -94,19 +96,19 @@ def create_stack_entries(pipeline):
             else:
                 _set_stack_entry(SolidStackEntry(solid, prev_stack_entry.plan_builder_stack))
 
-    return stack_entries
+    return StackTracker(root_builder, stack_entries)
 
 
 def create_execution_plan_core(context, pipeline, environment):
     execution_info = CreateExecutionPlanInfo(
-        context, pipeline, environment, create_stack_entries(pipeline)
+        context, pipeline, environment, create_stack_tracker(pipeline)
     )
-
-    plan_builder = PlanBuilder(steps=[], step_output_map=StepOutputMap())
 
     for solid in solids_in_topological_order(execution_info.pipeline):
 
-        step_inputs = create_step_inputs(execution_info, plan_builder, solid)
+        plan_builder = execution_info.builder_for_solid(solid)
+
+        step_inputs = create_step_inputs(execution_info, solid)
 
         solid_transform_step = create_transform_step(
             execution_info, solid, step_inputs, get_solid_user_config(execution_info, solid)
@@ -123,7 +125,7 @@ def create_execution_plan_core(context, pipeline, environment):
             output_handle = solid.output_handle(output_def.name)
             plan_builder.step_output_map[output_handle] = subplan.terminal_step_output_handle
 
-    return create_execution_plan_from_steps(plan_builder.steps)
+    return create_execution_plan_from_steps(execution_info.stack_tracker.root_builder.steps)
 
 
 def create_execution_plan_from_steps(steps):
@@ -174,15 +176,16 @@ def create_value_subplan_for_output(execution_info, solid, solid_transform_step,
     return decorate_with_output_materializations(execution_info, solid, output_def, subplan)
 
 
-def get_input_source_step_handle(execution_info, plan_builder, solid, input_def):
+def get_input_source_step_handle(execution_info, solid, input_def):
     check.inst_param(execution_info, 'execution_info', CreateExecutionPlanInfo)
-    check.inst_param(plan_builder, 'plan_builder', PlanBuilder)
     check.inst_param(solid, 'solid', Solid)
     check.inst_param(input_def, 'input_def', InputDefinition)
 
+    plan_builder = execution_info.builder_for_solid(solid)
     input_handle = solid.input_handle(input_def.name)
     solid_config = execution_info.environment.solids.get(solid.name)
     dependency_structure = execution_info.pipeline.dependency_structure
+
     if solid_config and input_def.name in solid_config.inputs:
         input_thunk_output_handle = create_input_thunk_execution_step(
             execution_info, solid, input_def, solid_config.inputs[input_def.name]
@@ -211,19 +214,22 @@ def get_input_source_step_handle(execution_info, plan_builder, solid, input_def)
         )
 
 
-def create_step_inputs(info, plan_builder, solid):
+def add_steps(info, solid, steps):
+    info.builder_for_solid(solid).steps.extend(steps)
+
+
+def create_step_inputs(info, solid):
     check.inst_param(info, 'info', CreateExecutionPlanInfo)
-    check.inst_param(plan_builder, 'plan_builder', PlanBuilder)
     check.inst_param(solid, 'solid', Solid)
 
     step_inputs = []
 
     for input_def in solid.definition.input_defs:
-        prev_step_output_handle = get_input_source_step_handle(info, plan_builder, solid, input_def)
+        prev_step_output_handle = get_input_source_step_handle(info, solid, input_def)
 
         subplan = create_value_subplan_for_input(info, solid, prev_step_output_handle, input_def)
 
-        plan_builder.steps.extend(subplan.steps)
+        add_steps(info, solid, subplan.steps)
         step_inputs.append(
             StepInput(input_def.name, input_def.runtime_type, subplan.terminal_step_output_handle)
         )

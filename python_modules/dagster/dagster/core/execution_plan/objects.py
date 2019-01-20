@@ -210,18 +210,19 @@ class ExecutionPlan(object):
 
 
 class CreateExecutionPlanInfo(
-    namedtuple('_ExecutionPlanInfo', 'context pipeline environment stack_entries')
+    namedtuple('_ExecutionPlanInfo', 'context pipeline environment stack_tracker')
 ):
-    def __new__(cls, context, pipeline, environment, stack_entries):
+    def __new__(cls, context, pipeline, environment, stack_tracker):
         return super(CreateExecutionPlanInfo, cls).__new__(
             cls,
             check.inst_param(context, 'context', RuntimeExecutionContext),
             check.inst_param(pipeline, 'pipeline', PipelineDefinition),
             check.inst_param(environment, 'environment', EnvironmentConfig),
-            check.dict_param(
-                stack_entries, 'stack_entries', key_type=str, value_type=SolidStackEntry
-            ),
+            check.inst_param(stack_tracker, 'stack_tracker', StackTracker),
         )
+
+    def builder_for_solid(self, solid):
+        return self.stack_tracker.stack_entries[solid.name].plan_builder_stack[-1]
 
 
 class ExecutionPlanSubsetInfo(namedtuple('_ExecutionPlanSubsetInfo', 'subset inputs')):
@@ -257,3 +258,14 @@ class StepOutputMap(dict):
 
 
 SolidStackEntry = namedtuple('SolidStackEntry', 'solid plan_builder_stack')
+
+
+class StackTracker(namedtuple('StackTracker', 'root_builder stack_entries')):
+    def __new__(cls, root_builder, stack_entries):
+        return super(StackTracker, cls).__new__(
+            cls,
+            check.inst_param(root_builder, 'root_builder', PlanBuilder),
+            check.dict_param(
+                stack_entries, 'stack_entries', key_type=str, value_type=SolidStackEntry
+            ),
+        )
