@@ -129,19 +129,20 @@ def create_execution_plan_core(context, pipeline, environment):
     )
 
     builder_stack = []
-    topological_solids_by_builder = {}
+    topological_solids_by_plan_id = {}
     for solid in topological_solids:
         stack_entry = execution_info.stack_tracker.stack_entries[solid.name]
         current_builder = stack_entry.plan_builder_stack[-1]
-        if current_builder not in topological_solids_by_builder:
-            topological_solids_by_builder[current_builder] = [solid]
+        current_plan_id = current_builder.plan_id
+        if current_plan_id not in topological_solids_by_plan_id:
+            topological_solids_by_plan_id[current_plan_id] = [solid]
             builder_stack.append(current_builder)
         else:
-            topological_solids_by_builder[current_builder].append(solid)
+            topological_solids_by_plan_id[current_plan_id].append(solid)
 
     plans = []
     for plan_builder in reversed(builder_stack):
-        for solid in topological_solids_by_builder[plan_builder]:
+        for solid in topological_solids_by_plan_id[plan_builder.plan_id]:
             step_inputs = create_step_inputs(execution_info, solid)
 
             solid_transform_step = create_transform_step(

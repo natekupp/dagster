@@ -263,7 +263,8 @@ class StepOutputMap(dict):
         return dict.__setitem__(self, key, val)
 
 
-SolidStackEntry = namedtuple('SolidStackEntry', 'solid plan_builder_stack')
+class SolidStackEntry(namedtuple('SolidStackEntry', 'solid plan_builder_stack')):
+    pass
 
 
 class StackTracker(namedtuple('StackTracker', 'root_builder stack_entries')):
