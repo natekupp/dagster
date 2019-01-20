@@ -52,7 +52,7 @@ def create_stack_tracker(pipeline):
 
     stack_entries = {}
 
-    def _set_stack_entry(stack_entries, new_entry):
+    def _set_stack_entry(new_entry):
         solid_name = new_entry.solid.name
         if solid_name not in stack_entries:
             stack_entries[solid_name] = new_entry
@@ -65,13 +65,13 @@ def create_stack_tracker(pipeline):
 
     for solid in solids_in_topological_order(pipeline):
         if not solid.definition.input_defs:
-            _set_stack_entry(stack_entries, SolidStackEntry(solid, initial_plan_builder_stack))
+            _set_stack_entry(SolidStackEntry(solid, initial_plan_builder_stack))
             continue
 
         for input_def in solid.definition.input_defs:
             input_handle = solid.input_handle(input_def.name)
             if not dep_structure.has_dep(input_handle):
-                _set_stack_entry(stack_entries, SolidStackEntry(solid, initial_plan_builder_stack))
+                _set_stack_entry(SolidStackEntry(solid, initial_plan_builder_stack))
                 continue
 
             prev_output_handle = dep_structure.get_dep(input_handle)
@@ -79,17 +79,14 @@ def create_stack_tracker(pipeline):
 
             if dep_structure.is_fanout_dep(input_handle):
                 _set_stack_entry(
-                    stack_entries,
                     SolidStackEntry(
                         solid, prev_stack_entry.plan_builder_stack + [empty_plan_builder()]
-                    ),
+                    )
                 )
             elif dep_structure.is_fanin_dep(input_handle):
-                _set_stack_entry(
-                    stack_entries, SolidStackEntry(solid, prev_stack_entry.plan_builder_stack[:-1])
-                )
+                _set_stack_entry(SolidStackEntry(solid, prev_stack_entry.plan_builder_stack[:-1]))
             else:
-                _set_stack_entry(stack_entries, prev_stack_entry.plan_builder_stack)
+                _set_stack_entry(prev_stack_entry.plan_builder_stack)
 
     return stack_entries
 
