@@ -25,6 +25,8 @@ from .deployment_package import get_or_create_deployment_package
 from .types import LambdaInvocationPayload
 from .utils import get_function_name, get_input_key, get_resources_key, get_step_key
 
+from ..types import DagmaEngine
+
 # TODO make this configurable on the dagma resource
 LAMBDA_MEMORY_SIZE = 3008
 
@@ -227,3 +229,20 @@ def execute_plan(context, execution_plan, cleanup_lambda_functions=True, local=F
                 'Deleting lambda function: {name}'.format(name=lambda_step['FunctionName'])
             )
             aws_lambda_client.delete_function(FunctionName=lambda_step['FunctionName'])
+
+
+class DagmaLambdaEngine(DagmaEngine):
+    def __init__(self, config):
+        pass
+
+    def deploy_runtime(self):
+        pass
+
+    def deploy_pipeline(self, pipeline, requirements, includes):
+        pass
+
+    def execute_solid_async(self):
+        pass
+
+    def execute_solid_sync(self):
+        pass

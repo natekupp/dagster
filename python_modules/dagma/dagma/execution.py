@@ -1,4 +1,7 @@
+import os
+
 import boto3
+
 from requirements import parse as parse_requirements
 
 from abc import ABC
@@ -248,7 +251,25 @@ class DagmaRequirementsConfig(list):
         return super(DagmaRequirementsConfig, cls).__new__(cls, items)
 
 
-def construct_dagma_config(config_value, additional_requirements, additional_includes):
+class DagmaIncludesConfig(list):
+    def __new__(cls, items):
+        items = check.opt_list_param(items, 'items', of_type=str)
+        return super(DagmaIncludesConfig, cls).__new__(cls, items)
+
+
+def construct_includes(config_includes, additional_includes, root_directory):
+    config_includes = [
+        os.path.abspath(os.path.join(root_directory, config_include))
+        for config_include in config_includes
+    ]
+    for include in additional_includes:
+        assert os.path.isabs(include)
+    return DagmaIncludesConfig(config_includes + additional_includes)
+
+
+def construct_dagma_config(
+    config_value, additional_requirements, additional_includes, root_directory
+):
     additional_requirements = check.opt_list_param(
         additional_requirements, 'additional_requirements', of_type=str
     )
@@ -262,12 +283,16 @@ def construct_dagma_config(config_value, additional_requirements, additional_inc
     return DagmaConfig(
         engine=construct_engine_config(config_value['engine']),
         requirements=DagmaRequirementsConfig(requirements + additional_requirements),
-        includes=construct_includes(includes, additional_includes),
+        includes=construct_includes(includes, additional_includes, root_directory),
     )
 
 
 def create_typed_dagma_environment(
-    pipeline, dagma_config=None, additional_requirements=None, additional_includes=None
+    pipeline,
+    dagma_config=None,
+    additional_requirements=None,
+    additional_includes=None,
+    root_directory=None,
 ):
     check.inst_param(pipeline, 'pipeline', PipelineDefinition)
     check.opt_dict_param(dagma_config, 'dagma_config')
@@ -279,7 +304,9 @@ def create_typed_dagma_environment(
     if not result.success:
         raise PipelineConfigEvaluationError(pipeline, result.errors, dagma_config)
 
-    return construct_dagma_config(result.value, additional_requirements, additional_includes)
+    return construct_dagma_config(
+        result.value, additional_requirements, additional_includes, root_directory
+    )
 
 
 def execute_pipeline(
@@ -288,6 +315,7 @@ def execute_pipeline(
     dagma_config,
     additional_requirements,
     additional_includes,
+    root_directory,
     throw_on_error=True,
     reentrant_info=None,
     solid_subset=None,
@@ -305,6 +333,8 @@ def execute_pipeline(
       additional_requirements (list[str]): A list of pip-installable requirements.
       additional_includes (list[str]): A list of file paths to files to include in the remote
         execution environment.
+      root_directory (str): The root directory for includes (should be the location of the
+        config file).
       throw_on_error (bool): If True, the function throws when an error is encoutered rather than
         returning the py:class:`SolidExecutionResult` in an error-state. Default: True.
       reentrant_info (ReentrantInfo): Optional reentrant info for pipeline execution, Default: None.
@@ -322,7 +352,11 @@ def execute_pipeline(
     typed_environment = create_typed_environment(pipeline_to_execute, environment)
 
     dagma_environment = create_typed_dagma_environment(
-        pipeline_to_execute, dagma_config, additional_requirements, additional_includes
+        pipeline_to_execute,
+        dagma_config,
+        additional_requirements,
+        additional_includes,
+        root_directory,
     )
     raise Exception()
     # Check that the pipeline has a dagma resource available

@@ -102,8 +102,15 @@ def _do_run_command(
 
     dagma_config = load_yaml_from_path(dagma_config_path)
 
+    root_directory = os.path.dirname(os.path.abspath(dagma_config_path))
+
     pipeline_iter = execute_pipeline(
-        pipeline, env_config, dagma_config, additional_requirements, additional_includes
+        pipeline,
+        env_config,
+        dagma_config,
+        additional_requirements,
+        additional_includes,
+        root_directory,
     )
 
     _process_results_for_console(pipeline_iter)
