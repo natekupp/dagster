@@ -255,3 +255,23 @@ class DependencyDefinition(namedtuple('_DependencyDefinition', 'solid output des
             check.str_param(output, 'output'),
             check.opt_str_param(description, 'description'),
         )
+
+    @property
+    def is_fanin(self):
+        return False
+
+    @property
+    def is_fanout(self):
+        return False
+
+
+class FaninDependencyDefinition(DependencyDefinition):
+    @property
+    def is_fanin(self):
+        return True
+
+
+class FanoutDependencyDefinition(DependencyDefinition):
+    @property
+    def is_fanout(self):
+        return True
