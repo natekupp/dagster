@@ -4,12 +4,20 @@ from dagster.core.definitions import InputDefinition, Result, Solid
 
 from dagster.core.errors import DagsterInvariantViolationError
 
-from .objects import ExecutionPlanInfo, ExecutionStep, StepOutput, StepOutputHandle, StepTag
+from .objects import (
+    ExecutionPlanInfo,
+    ExecutionStep,
+    StepBuilderState,
+    StepOutput,
+    StepOutputHandle,
+    StepTag,
+)
 
 INPUT_THUNK_OUTPUT = 'input_thunk_output'
 
 
-def _create_input_thunk_execution_step(solid, input_def, config_value):
+def _create_input_thunk_execution_step(state, solid, input_def, config_value):
+    check.inst_param(state, 'state', StepBuilderState)
     check.invariant(input_def.runtime_type.input_schema)
 
     def _fn(_context, _step, _inputs):
@@ -26,8 +34,9 @@ def _create_input_thunk_execution_step(solid, input_def, config_value):
     )
 
 
-def create_input_thunk_execution_step(info, solid, input_def, value):
+def create_input_thunk_execution_step(info, state, solid, input_def, value):
     check.inst_param(info, 'info', ExecutionPlanInfo)
+    check.inst_param(state, 'state', StepBuilderState)
     check.inst_param(solid, 'solid', Solid)
     check.inst_param(input_def, 'input_def', InputDefinition)
 
@@ -46,5 +55,5 @@ def create_input_thunk_execution_step(info, solid, input_def, value):
             )
         )
 
-    input_thunk = _create_input_thunk_execution_step(solid, input_def, value)
+    input_thunk = _create_input_thunk_execution_step(state, solid, input_def, value)
     return StepOutputHandle(input_thunk, INPUT_THUNK_OUTPUT)

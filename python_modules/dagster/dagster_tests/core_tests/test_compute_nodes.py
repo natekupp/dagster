@@ -78,10 +78,10 @@ def test_duplicate_steps():
         create_execution_plan_from_steps(
             [
                 ExecutionStep(
-                    'same_name', [], [], lambda *args, **kwargs: None, StepTag.TRANSFORM, foo
+                    'same_name', [], [], lambda *args, **kwargs: None, StepTag.TRANSFORM, foo, []
                 ),
                 ExecutionStep(
-                    'same_name', [], [], lambda *args, **kwargs: None, StepTag.TRANSFORM, foo
+                    'same_name', [], [], lambda *args, **kwargs: None, StepTag.TRANSFORM, foo, []
                 ),
             ]
         )

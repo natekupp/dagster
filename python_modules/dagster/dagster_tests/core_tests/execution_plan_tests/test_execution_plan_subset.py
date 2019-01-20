@@ -20,6 +20,8 @@ from dagster.core.execution import (
     yield_context,
 )
 
+from dagster.core.execution_plan.objects import StepBuilderState
+
 from dagster.core.execution_plan.utility import VALUE_OUTPUT
 
 

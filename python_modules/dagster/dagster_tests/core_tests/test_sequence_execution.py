@@ -61,7 +61,7 @@ def test_sequence_pipeline():
     assert events == ['enqueue-1', 'dequeue-1', 'enqueue-2', 'dequeue-2']
 
 
-@pytest.mark.skip('for now')
+# @pytest.mark.skip('for now')
 def test_basic_fan_out():
     def _produce_things():
         yield 1

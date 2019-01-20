@@ -1,13 +1,23 @@
 from collections import namedtuple
 from enum import Enum
+import copy
 import toposort
 
 from dagster import check
 from dagster.core.system_config.objects import EnvironmentConfig
-from dagster.core.definitions import PipelineDefinition, Solid
+from dagster.core.definitions import PipelineDefinition, Solid, SolidOutputHandle
 from dagster.core.errors import DagsterError
 from dagster.core.execution_context import RuntimeExecutionContext
 from dagster.core.types.runtime import RuntimeType
+
+
+# This is the state that is built up during the execution plan build process.
+# steps is just a list of the steps that have been created
+# step_output_map maps logical solid outputs (solid_name, output_name) to particular
+# step outputs. This covers the case where a solid maps to multiple steps
+# and one wants to be able to attach to the logical output of a solid during execution
+class StepBuilderState(namedtuple('_StepBuilderState', 'steps step_output_map fanout_step_stack')):
+    pass
 
 
 class StepOutputHandle(namedtuple('_StepOutputHandle', 'step output_name')):
@@ -109,10 +119,36 @@ class StepOutput(namedtuple('_StepOutput', 'name runtime_type')):
         )
 
 
+class StepOutputMap(dict):
+    def __getitem__(self, key):
+        check.inst_param(key, 'key', SolidOutputHandle)
+        return dict.__getitem__(self, key)
+
+    def __setitem__(self, key, val):
+        check.inst_param(key, 'key', SolidOutputHandle)
+        check.inst_param(val, 'val', StepOutputHandle)
+        return dict.__setitem__(self, key, val)
+
+
+def get_validated_fanout_step_stack(step_inputs):
+    if not step_inputs:
+        return []
+
+    fanout_step_stack = step_inputs[0].prev_output_handle.step.fanout_step_stack
+
+    for other_input in step_inputs[1:]:
+        check.invariant(fanout_step_stack == other_input.prev_output_handle.step.fanout_step_stack)
+
+    return fanout_step_stack
+
+
 class ExecutionStep(
     namedtuple(
         '_ExecutionStep',
-        'key step_inputs step_input_dict step_outputs step_output_dict compute_fn tag solid',
+        (
+            'key step_inputs step_input_dict step_outputs step_output_dict compute_fn tag solid '
+            'existing_step_stack'
+        ),
     )
 ):
     def __new__(cls, key, step_inputs, step_outputs, compute_fn, tag, solid):
@@ -126,7 +162,12 @@ class ExecutionStep(
             compute_fn=check.callable_param(compute_fn, 'compute_fn'),
             tag=check.inst_param(tag, 'tag', StepTag),
             solid=check.inst_param(solid, 'solid', Solid),
+            existing_step_stack=get_validated_fanout_step_stack(step_inputs),
         )
+
+    @property
+    def fanout_step_stack(self):
+        return self.existing_step_stack
 
     def __getnewargs__(self):
         # print('getnewargs was called')
