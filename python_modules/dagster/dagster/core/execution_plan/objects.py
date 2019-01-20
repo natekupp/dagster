@@ -1,7 +1,8 @@
 from collections import namedtuple
 from enum import Enum
-import toposort
 import uuid
+
+import toposort
 
 from dagster import check
 from dagster.core.system_config.objects import EnvironmentConfig
@@ -11,12 +12,21 @@ from dagster.core.execution_context import RuntimeExecutionContext
 from dagster.core.types.runtime import RuntimeType
 
 
-class StepOutputHandle(namedtuple('_StepOutputHandle', 'step output_name')):
+class StepOutputHandle:
+    @staticmethod
+    def create(step, output_name):
+        return ActualStepOutputHandle(step, output_name)
+
+    @staticmethod
+    def sentinel():
+        return SentinelStepOutputHandle()
+
+
+class ActualStepOutputHandle(namedtuple('_StepOutputHandle', 'step output_name'), StepOutputHandle):
     def __new__(cls, step, output_name):
-        return super(StepOutputHandle, cls).__new__(
+        return super(ActualStepOutputHandle, cls).__new__(
             cls,
-            # Optional for now to account for sentinel
-            step=check.opt_inst_param(step, 'step', ExecutionStep),
+            step=check.inst_param(step, 'step', ExecutionStep),
             output_name=check.str_param(output_name, 'output_name'),
         )
 
@@ -37,6 +47,10 @@ class StepOutputHandle(namedtuple('_StepOutputHandle', 'step output_name')):
 
     def __eq__(self, other):
         return self.step.key == other.step.key and self.output_name == other.output_name
+
+
+class SentinelStepOutputHandle(StepOutputHandle):
+    pass
 
 
 class StepSuccessData(namedtuple('_StepSuccessData', 'output_name value')):

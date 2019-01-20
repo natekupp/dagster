@@ -26,9 +26,11 @@ from .objects import (
     StepOutput,
     StepTag,
     PlanBuilder,
+    StepResult,
     StepOutputMap,
     SolidStackEntry,
     StackTracker,
+    StepSuccessData,
 )
 
 from .transform import create_transform_step
@@ -238,36 +240,28 @@ class Sequence(object):
 from .simple_engine import execute_plan_core
 
 
-def _create_output_sequence(context, input_sequence, subplan, step_output_handle):
+def _create_output_sequence(context, step, input_sequence, subplan):
     def _produce_output_sequence():
         for item in input_sequence.items():
+            step_result = StepResult.success_result(step, step.tag, StepSuccessData('kjdfkd', item))
 
-            intermediate_results = {step_output_handle: item}
+            intermediate_results = {SUBPLAN_BEGIN_SENTINEL: step_result}
             for inner_result in execute_plan_core(context, subplan, intermediate_results):
                 # will need to check what output this is?
                 # what to do on error?
-                yield inner_result.value
+                yield inner_result.success_data.value
 
     return Sequence(_produce_output_sequence)
 
 
-def _create_subplan_executor_compute(subplan, step_output_handle):
+def _create_subplan_executor_compute(subplan):
     check.inst_param(subplan, 'subplan', ExecutionPlan)
 
-    def _do_subplan_executor_compute(context, _step, inputs):
+    def _do_subplan_executor_compute(context, step, inputs):
         input_sequence = inputs[SUBPLAN_EXECUTOR_SEQUENCE_INPUT]
 
-        def _produce_output_sequence():
-            for item in input_sequence.items():
-
-                intermediate_results = {step_output_handle: item}
-                for inner_result in execute_plan_core(context, subplan, intermediate_results):
-                    # will need to check what output this is?
-                    # what to do on error?
-                    yield inner_result.value
-
         yield Result(
-            _create_output_sequence(context, input_sequence, subplan, step_output_handle),
+            _create_output_sequence(context, step, input_sequence, subplan),
             SUBPLAN_EXECUTOR_SEQUENCE_OUTPUT,
         )
 
@@ -295,9 +289,7 @@ def create_subplan_executor_step(
             )
         ],
         step_outputs=[StepOutput(SUBPLAN_EXECUTOR_SEQUENCE_OUTPUT, sequence_type)],
-        compute_fn=_create_subplan_executor_compute(
-            subplan, value_subplan.terminal_step_output_handle
-        ),
+        compute_fn=_create_subplan_executor_compute(subplan),
         tag=StepTag.SUBPLAN_EXECUTOR,
         solid=solid,
         subplan=subplan,
@@ -385,7 +377,7 @@ def get_input_source_step_handle(execution_info, solid, input_def):
         )
 
 
-SUBPLAN_BEGIN_SENTINEL = StepOutputHandle(None, 'SUBPLAN_ENTRY')
+SUBPLAN_BEGIN_SENTINEL = StepOutputHandle.sentinel()
 
 
 def create_step_inputs(execution_info, solid):

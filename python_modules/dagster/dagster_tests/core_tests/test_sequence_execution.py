@@ -155,7 +155,6 @@ def test_only_fanout_create_execution_plan():
     assert subplan.steps[0].tag == StepTag.TRANSFORM
 
 
-@pytest.mark.skip('not yet')
 def test_only_fanout_execute_pipeline():
     fanout_pipeline = define_fanout_only_pipeline()
     plan = create_execution_plan(fanout_pipeline)

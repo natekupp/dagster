@@ -34,7 +34,7 @@ def create_join_step(solid, step_key, prev_steps, prev_output_name):
         else:
             check.invariant(seen_runtime_type == prev_step_output.runtime_type)
 
-        output_handle = StepOutputHandle(prev_step, prev_output_name)
+        output_handle = StepOutputHandle.create(prev_step, prev_output_name)
 
         step_inputs.append(StepInput(prev_step.key, prev_step_output.runtime_type, output_handle))
 
@@ -73,7 +73,7 @@ def create_joining_value_subplan(solid, join_step_key, parallel_steps, parallel_
 
     output_name = join_step.step_outputs[0].name
     return ExecutionValueSubPlan(
-        parallel_steps + [join_step], StepOutputHandle(join_step, output_name)
+        parallel_steps + [join_step], StepOutputHandle.create(join_step, output_name)
     )
 
 
@@ -84,7 +84,7 @@ def create_value_thunk_step(solid, runtime_type, step_key, value):
     def _fn(_context, _step, _inputs):
         yield Result(value, VALUE_OUTPUT)
 
-    return StepOutputHandle(
+    return StepOutputHandle.create(
         ExecutionStep(
             key=step_key,
             step_inputs=[],

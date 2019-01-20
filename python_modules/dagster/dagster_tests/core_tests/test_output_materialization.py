@@ -247,7 +247,7 @@ def test_basic_int_and_string_execution_plan():
         'return_one_and_foo.materialization.output.string.0'
     )
     assert len(string_mat_step.step_inputs) == 1
-    assert string_mat_step.step_inputs[0].prev_output_handle == StepOutputHandle(
+    assert string_mat_step.step_inputs[0].prev_output_handle == StepOutputHandle.create(
         step=transform_step, output_name='string'
     )
 
@@ -255,7 +255,7 @@ def test_basic_int_and_string_execution_plan():
         'return_one_and_foo.materialization.output.string.join'
     )
     assert len(string_mat_join_step.step_inputs) == 1
-    assert string_mat_join_step.step_inputs[0].prev_output_handle == StepOutputHandle(
+    assert string_mat_join_step.step_inputs[0].prev_output_handle == StepOutputHandle.create(
         step=string_mat_step, output_name=MATERIALIZATION_THUNK_OUTPUT
     )
 

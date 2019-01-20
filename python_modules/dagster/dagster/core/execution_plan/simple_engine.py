@@ -73,7 +73,7 @@ def execute_plan_core(context, execution_plan, intermediate_results=None):
             check.invariant(isinstance(result, StepResult))
             yield result
             if result.success:
-                output_handle = StepOutputHandle(step, result.success_data.output_name)
+                output_handle = StepOutputHandle.create(step, result.success_data.output_name)
                 intermediate_results[output_handle] = result
 
 

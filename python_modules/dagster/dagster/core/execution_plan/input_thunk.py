@@ -47,4 +47,4 @@ def create_input_thunk_execution_step(info, solid, input_def, value):
         )
 
     input_thunk = _create_input_thunk_execution_step(solid, input_def, value)
-    return StepOutputHandle(input_thunk, INPUT_THUNK_OUTPUT)
+    return StepOutputHandle.create(input_thunk, INPUT_THUNK_OUTPUT)

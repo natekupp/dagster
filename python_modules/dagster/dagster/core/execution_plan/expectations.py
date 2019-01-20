@@ -124,8 +124,8 @@ def decorate_with_expectations(execution_info, solid, transform_step, output_def
         return create_expectations_value_subplan(
             solid,
             output_def,
-            StepOutputHandle(transform_step, output_def.name),
+            StepOutputHandle.create(transform_step, output_def.name),
             tag=StepTag.OUTPUT_EXPECTATION,
         )
     else:
-        return ExecutionValueSubPlan.empty(StepOutputHandle(transform_step, output_def.name))
+        return ExecutionValueSubPlan.empty(StepOutputHandle.create(transform_step, output_def.name))
