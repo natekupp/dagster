@@ -28,8 +28,8 @@ from dagster.core.system_config.types import (
 )
 from dagster.utils import single_item
 
+from ..types import DagmaEngineConfig
 from .aws_lambda import Storage
-
 from .config import (
     DEFAULT_PUT_OBJECT_ACL,
     DEFAULT_PUT_OBJECT_STORAGE_CLASS,
@@ -162,12 +162,6 @@ DagmaConfigType = SystemNamedDict(
         ),
     },
 ).inst()
-
-
-class DagmaEngineConfig(ABC):
-    '''Abstract base class for dagma engine configs.'''
-
-    pass
 
 
 class AirflowEngineConfig(namedtuple('_AirflowEngineConfig', ''), DagmaEngineConfig):
