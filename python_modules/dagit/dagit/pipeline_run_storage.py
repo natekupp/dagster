@@ -30,9 +30,15 @@ class PipelineRunStorage(object):
             create_pipeline_run = InMemoryPipelineRun
         self._create_pipeline_run = create_pipeline_run
 
-    def add_run(self, pipeline_run):
-        check.inst_param(pipeline_run, 'pipeline_run', PipelineRun)
-        self._runs[pipeline_run.run_id] = pipeline_run
+    def register_new_run(self, new_run_id, selector, env_config, execution_plan):
+        check.str_param(new_run_id, 'new_run_id')
+        check.inst_param(selector, 'selector', ExecutionSelector)
+        check.opt_dict_param(env_config, 'env_config')
+        check.inst_param(execution_plan, 'execution_plan', ExecutionPlan)
+
+        new_run = self._create_pipeline_run(new_run_id, selector, env_config, execution_plan)
+        self._runs[new_run_id] = new_run
+        return new_run
 
     def all_runs(self):
         return self._runs.values()
@@ -45,9 +51,6 @@ class PipelineRunStorage(object):
 
     def __getitem__(self, id_):
         return self.get_run_by_id(id_)
-
-    def create_run(self, *args, **kwargs):
-        return self._create_pipeline_run(*args, **kwargs)
 
 
 class PipelineRun(object):

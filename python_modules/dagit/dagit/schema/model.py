@@ -132,8 +132,9 @@ def start_pipeline_execution(info, selector, config):
                 pipeline.get_dagster_pipeline(),
                 construct_environment_config(validated_config_either.value),
             )
-            run = pipeline_run_storage.create_run(new_run_id, selector, env_config, execution_plan)
-            pipeline_run_storage.add_run(run)
+            run = pipeline_run_storage.register_new_run(
+                new_run_id, selector, env_config, execution_plan
+            )
 
             info.context.execution_manager.execute_pipeline(
                 info.context.repository_container, pipeline.get_dagster_pipeline(), run
