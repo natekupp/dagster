@@ -11,6 +11,8 @@ from dagster import (
     solid,
 )
 
+from dagster.core.definitions import solids_in_topological_order
+
 from dagster.core.definitions.dependency import (
     FanoutDependencyDefinition,
     FaninDependencyDefinition,
@@ -106,7 +108,9 @@ def test_basic_fanin_fanout_dep_structure():
 
 def test_stack_builder():
     pipeline_def = define_basic_fanin_fanout_pipeline()
-    stack_entries = create_stack_tracker(pipeline_def).stack_entries
+    stack_entries = create_stack_tracker(
+        pipeline_def, solids_in_topological_order(pipeline_def)
+    ).stack_entries
     assert len(stack_entries) == 3
     assert len(stack_entries['produce_sequence'].plan_builder_stack) == 1
     assert len(stack_entries['add_one'].plan_builder_stack) == 2

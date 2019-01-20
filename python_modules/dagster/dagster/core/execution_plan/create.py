@@ -48,7 +48,7 @@ def empty_plan_builder():
     return PlanBuilder(steps=[], step_output_map=StepOutputMap())
 
 
-def create_stack_tracker(pipeline):
+def create_stack_tracker(pipeline, topological_solids):
     root_builder = empty_plan_builder()
     initial_plan_builder_stack = [root_builder]
 
@@ -71,7 +71,7 @@ def create_stack_tracker(pipeline):
 
     dep_structure = pipeline.dependency_structure
 
-    for solid in solids_in_topological_order(pipeline):
+    for solid in topological_solids:
         if not solid.definition.input_defs:
             _set_stack_entry(SolidStackEntry(solid, initial_plan_builder_stack))
             continue
@@ -100,11 +100,12 @@ def create_stack_tracker(pipeline):
 
 
 def create_execution_plan_core(context, pipeline, environment):
+    topological_solids = solids_in_topological_order(pipeline)
     execution_info = CreateExecutionPlanInfo(
-        context, pipeline, environment, create_stack_tracker(pipeline)
+        context, pipeline, environment, create_stack_tracker(pipeline, topological_solids)
     )
 
-    for solid in solids_in_topological_order(execution_info.pipeline):
+    for solid in topological_solids:
 
         plan_builder = execution_info.builder_for_solid(solid)
 
@@ -176,6 +177,15 @@ def create_value_subplan_for_output(execution_info, solid, solid_transform_step,
     return decorate_with_output_materializations(execution_info, solid, output_def, subplan)
 
 
+class CompositeExecutionStep(ExecutionStep):
+    def __new__(cls, **kwargs):
+        return super(CompositeExecutionStep, cls).__new__(cls, **kwargs)
+
+
+def create_fanout_composite_step(execution_info, solid):
+    check.inst_param(execution_info, 'execution_info', CreateExecutionPlanInfo)
+
+
 def get_input_source_step_handle(execution_info, solid, input_def):
     check.inst_param(execution_info, 'execution_info', CreateExecutionPlanInfo)
     check.inst_param(solid, 'solid', Solid)
@@ -214,22 +224,22 @@ def get_input_source_step_handle(execution_info, solid, input_def):
         )
 
 
-def add_steps(info, solid, steps):
-    info.builder_for_solid(solid).steps.extend(steps)
-
-
-def create_step_inputs(info, solid):
-    check.inst_param(info, 'info', CreateExecutionPlanInfo)
+def create_step_inputs(execution_info, solid):
+    check.inst_param(execution_info, 'execution_info', CreateExecutionPlanInfo)
     check.inst_param(solid, 'solid', Solid)
 
     step_inputs = []
 
+    plan_builder = execution_info.builder_for_solid(solid)
+
     for input_def in solid.definition.input_defs:
-        prev_step_output_handle = get_input_source_step_handle(info, solid, input_def)
+        prev_step_output_handle = get_input_source_step_handle(execution_info, solid, input_def)
 
-        subplan = create_value_subplan_for_input(info, solid, prev_step_output_handle, input_def)
+        subplan = create_value_subplan_for_input(
+            execution_info, solid, prev_step_output_handle, input_def
+        )
 
-        add_steps(info, solid, subplan.steps)
+        plan_builder.steps.extend(subplan.steps)
         step_inputs.append(
             StepInput(input_def.name, input_def.runtime_type, subplan.terminal_step_output_handle)
         )
