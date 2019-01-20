@@ -91,8 +91,8 @@ def create_stack_tracker(pipeline):
     return stack_entries
 
 
-def create_execution_plan_core(execution_info):
-    check.inst_param(execution_info, 'execution_info', CreateExecutionPlanInfo)
+def create_execution_plan_core(context, pipeline, environment):
+    execution_info = CreateExecutionPlanInfo(context, pipeline, environment)
 
     plan_builder = PlanBuilder(steps=[], step_output_map=StepOutputMap())
 
@@ -223,8 +223,7 @@ def create_step_inputs(info, plan_builder, solid):
     return step_inputs
 
 
-def create_subplan(execution_plan_info, execution_plan, subset_info):
-    check.inst_param(execution_plan_info, 'execution_plan_info', CreateExecutionPlanInfo)
+def create_subplan(execution_plan, subset_info):
     check.inst_param(execution_plan, 'execution_plan', ExecutionPlan)
     check.inst_param(subset_info, 'subset_info', ExecutionPlanSubsetInfo)
 

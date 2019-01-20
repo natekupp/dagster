@@ -13,7 +13,6 @@ from dagster.core.system_config.objects import EnvironmentConfig
 from dagster.core.execution import create_execution_plan
 
 from dagster.core.execution_plan.create import (
-    CreateExecutionPlanInfo,
     create_execution_plan_core,
     create_execution_plan_from_steps,
 )
@@ -44,7 +43,7 @@ def test_compute_noop_node_core():
     environment = EnvironmentConfig()
 
     plan = create_execution_plan_core(
-        CreateExecutionPlanInfo(create_test_runtime_execution_context(), pipeline, environment)
+        create_test_runtime_execution_context(), pipeline, environment
     )
 
     assert len(plan.steps) == 1

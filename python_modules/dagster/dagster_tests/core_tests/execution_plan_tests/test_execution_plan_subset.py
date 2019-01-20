@@ -15,7 +15,6 @@ from dagster.core.execution import (
     create_execution_plan,
     execute_plan,
     create_typed_environment,
-    CreateExecutionPlanInfo,
     ExecutionPlanSubsetInfo,
     yield_context,
 )
@@ -67,11 +66,8 @@ def test_create_subplan_source_step():
     execution_plan = create_execution_plan(pipeline_def)
     with yield_context(pipeline_def, typed_environment) as context:
         subplan = create_subplan(
-            CreateExecutionPlanInfo(
-                context=context, pipeline=pipeline_def, environment=typed_environment
-            ),
-            execution_plan,
-            ExecutionPlanSubsetInfo(['return_one.transform']),
+            execution_plan=execution_plan,
+            subset_info=ExecutionPlanSubsetInfo(['return_one.transform']),
         )
         assert subplan
         assert len(subplan.steps) == 1
@@ -87,9 +83,6 @@ def test_create_subplan_middle_step():
     execution_plan = create_execution_plan(pipeline_def)
     with yield_context(pipeline_def, typed_environment) as context:
         subplan = create_subplan(
-            CreateExecutionPlanInfo(
-                context=context, pipeline=pipeline_def, environment=typed_environment
-            ),
             execution_plan,
             ExecutionPlanSubsetInfo(['add_one.transform'], {'add_one.transform': {'num': 2}}),
         )
