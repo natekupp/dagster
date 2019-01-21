@@ -1,25 +1,26 @@
-import pytest
-
 from dagster import (
     DependencyDefinition,
     InputDefinition,
     Int,
     OutputDefinition,
     PipelineDefinition,
-    dagster_type,
     execute_pipeline,
     solid,
 )
 
 from dagster.core.definitions import solids_in_topological_order
-
 from dagster.core.definitions.dependency import (
     FanoutDependencyDefinition,
     FaninDependencyDefinition,
 )
 
-from dagster.core.execution import create_execution_plan, execute_plan, create_execution_plan
-from dagster.core.execution_plan.create import create_stack_tracker, Sequence, StepTag
+from dagster.core.execution import execute_plan, create_execution_plan
+from dagster.core.execution_plan.create import (
+    SUBPLAN_EXECUTOR_SEQUENCE_OUTPUT,
+    Sequence,
+    StepTag,
+    create_stack_tracker,
+)
 
 
 def test_sequence_pipeline():
@@ -169,7 +170,29 @@ def test_basic_fanout_fanin_execution_plan():
     plan = create_execution_plan(pipeline_def)
     assert len(plan.steps) == 3
 
-    assert plan.steps[0].tag == StepTag.TRANSFORM
+    produce_sequence_transform_step = plan.steps[0]
+    assert produce_sequence_transform_step.tag == StepTag.TRANSFORM
+    assert not produce_sequence_transform_step.step_inputs
+    assert len(produce_sequence_transform_step.step_outputs) == 1
+
+    ps_t_output = produce_sequence_transform_step.step_outputs[0]
+    assert ps_t_output.name == 'result'
+    assert ps_t_output.runtime_type.name == 'Sequence'
+
+    cst_step = plan.get_step_by_key('consume_sequence.transform')
+    assert cst_step.key == 'consume_sequence.transform'
+    assert len(cst_step.step_inputs) == 1
+    cst_step_input = cst_step.step_inputs[0]
+    assert cst_step_input.name == 'seq'
+    assert cst_step_input.runtime_type.name == 'Sequence'
+
+    assert cst_step_input.prev_output_handle.output_name == SUBPLAN_EXECUTOR_SEQUENCE_OUTPUT
+
+    assert (
+        plan.get_step_by_key(cst_step_input.prev_output_handle.step.key).tag
+        == StepTag.SUBPLAN_EXECUTOR
+    )
+
     assert plan.steps[1].tag == StepTag.SUBPLAN_EXECUTOR
     assert plan.steps[2].tag == StepTag.TRANSFORM
 

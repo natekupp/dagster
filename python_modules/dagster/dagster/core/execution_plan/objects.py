@@ -220,7 +220,7 @@ class ExecutionPlan(object):
             step_dict, 'step_dict', key_type=str, value_type=ExecutionStep
         )
         self.deps = check.dict_param(deps, 'deps', key_type=str, value_type=set)
-        self.steps = list(step_dict.values())
+        self.steps = self.topological_steps()
 
     def get_step_by_key(self, key):
         return self.step_dict[key]
