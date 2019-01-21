@@ -163,7 +163,7 @@ def create_execution_plan_core(context, pipeline, environment):
 
             for output_def in solid.definition.output_defs:
                 subplan = create_value_subplan_for_output(
-                    execution_info, solid, solid_transform_step, output_def
+                    execution_info, plan_builder, solid, solid_transform_step, output_def
                 )
                 plan_builder.steps.extend(subplan.steps)
 
@@ -202,7 +202,7 @@ def create_execution_plan_from_steps(plan_builder):
             if not step_input.prev_output_handle is SUBPLAN_BEGIN_SENTINEL:
                 deps[step.key].add(step_input.prev_output_handle.step.key)
 
-    return ExecutionPlan(step_dict, deps)
+    return ExecutionPlan(plan_builder.plan_id, step_dict, deps)
 
 
 def create_value_subplan_for_input(execution_info, solid, prev_step_output_handle, input_def):
@@ -295,7 +295,7 @@ def create_subplan_executor_step(
     )
 
 
-def decorate_with_subplan_executors(execution_info, solid, output_def, value_subplan):
+def decorate_with_subplan_executors(execution_info, plan_builder, solid, output_def, value_subplan):
     dep_structure = execution_info.pipeline.dependency_structure
     output_handle = solid.output_handle(output_def.name)
     subplan_executors = []
@@ -306,12 +306,18 @@ def decorate_with_subplan_executors(execution_info, solid, output_def, value_sub
             )
             subplan_executors.append(subplan_executor_step)
 
+            plan_builder.plan_output_map[
+                subplan_executor_step.subplan.plan_id
+            ] = StepOutputHandle.create(subplan_executor_step, SUBPLAN_EXECUTOR_SEQUENCE_OUTPUT)
+
     return ExecutionValueSubPlan(
         value_subplan.steps + subplan_executors, value_subplan.terminal_step_output_handle
     )
 
 
-def create_value_subplan_for_output(execution_info, solid, solid_transform_step, output_def):
+def create_value_subplan_for_output(
+    execution_info, plan_builder, solid, solid_transform_step, output_def
+):
     check.inst_param(execution_info, 'execution_info', CreateExecutionPlanInfo)
     check.inst_param(solid, 'solid', Solid)
     check.inst_param(solid_transform_step, 'solid_transform_step', ExecutionStep)
@@ -325,7 +331,9 @@ def create_value_subplan_for_output(execution_info, solid, solid_transform_step,
         execution_info, solid, output_def, value_subplan
     )
 
-    return decorate_with_subplan_executors(execution_info, solid, output_def, value_subplan)
+    return decorate_with_subplan_executors(
+        execution_info, plan_builder, solid, output_def, value_subplan
+    )
 
 
 # class CompositeExecutionStep(ExecutionStep):
@@ -356,7 +364,9 @@ def get_input_source_step_handle(execution_info, solid, input_def):
     elif dependency_structure.has_dep(input_handle):
         solid_output_handle = dependency_structure.get_dep(input_handle)
         if dependency_structure.is_fanin_dep(input_handle):
-            check.not_implemented('fanin')
+            # We need to get the step output handle of the subplan executor
+            subplan_id = execution_info.solid_to_plan_id[solid_output_handle.solid.name]
+            return plan_builder.plan_output_map[subplan_id]
         elif dependency_structure.is_fanout_dep(input_handle):
             # This is going to be the entry point into the subplan
             return SUBPLAN_BEGIN_SENTINEL

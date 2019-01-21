@@ -204,15 +204,31 @@ class RuntimeExecutionContext:
     def values(self, ddict):
         check.dict_param(ddict, 'ddict')
 
+        old_values = {}
         for key, value in ddict.items():
-            check.invariant(not key in self._context_stack, 'Should not be in context')
+            if key in self._context_stack:
+                old_values[key] = value
+
+            #
+            # TODO: we should probably have a solid context stack instead of managing it like this
+            #
+            #     check.failed(
+            #         (
+            #             'Should not be in context. Key {key}. Old value {old_value}. '
+            #             'New value {new_value}.'
+            #         ).format(key=key, old_value=self._context_stack[key], new_value=value)
+            #     )
+
             self._context_stack[key] = value
 
         try:
             yield
         finally:
             for key in ddict.keys():
-                self._context_stack.pop(key)
+                if key in old_values:
+                    self._context_stack[key] = old_values[key]
+                else:
+                    self._context_stack.pop(key)
 
     @property
     def run_id(self):

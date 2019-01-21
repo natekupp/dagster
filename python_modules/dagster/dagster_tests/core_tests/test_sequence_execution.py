@@ -18,6 +18,7 @@ from dagster.core.definitions.dependency import (
     FaninDependencyDefinition,
 )
 
+from dagster.core.execution import create_execution_plan, execute_plan, create_execution_plan
 from dagster.core.execution_plan.create import create_stack_tracker, Sequence, StepTag
 
 
@@ -52,7 +53,7 @@ def test_sequence_pipeline():
     assert events == ['enqueue-1', 'dequeue-1', 'enqueue-2', 'dequeue-2']
 
 
-def define_basic_fanin_fanout_pipeline():
+def define_basic_fanout_fanin_pipeline():
     def _produce_things():
         yield 1
         yield 2
@@ -67,8 +68,11 @@ def define_basic_fanin_fanout_pipeline():
 
     @solid(inputs=[InputDefinition('seq', Sequence)])
     def consume_sequence(_info, seq):
+        output = []
         for val in seq.items():
             print(val)
+            output.append(val)
+        return output
 
     return PipelineDefinition(
         name='sequence_pipeline',
@@ -81,7 +85,7 @@ def define_basic_fanin_fanout_pipeline():
 
 
 def test_basic_fanin_fanout_dep_structure():
-    pipeline_def = define_basic_fanin_fanout_pipeline()
+    pipeline_def = define_basic_fanout_fanin_pipeline()
 
     add_one_solid = pipeline_def.solid_named('add_one')
     assert pipeline_def.dependency_structure.is_fanout_dep(add_one_solid.input_handle('num'))
@@ -97,7 +101,7 @@ def test_basic_fanin_fanout_dep_structure():
 
 
 def test_stack_builder():
-    pipeline_def = define_basic_fanin_fanout_pipeline()
+    pipeline_def = define_basic_fanout_fanin_pipeline()
     stack_entries = create_stack_tracker(
         pipeline_def, solids_in_topological_order(pipeline_def)
     ).stack_entries
@@ -115,9 +119,6 @@ def test_stack_builder():
         stack_entries['produce_sequence'].plan_builder_stack[0]
         == stack_entries['consume_sequence'].plan_builder_stack[0]
     )
-
-
-from dagster.core.execution import create_execution_plan, execute_plan, create_execution_plan
 
 
 def define_fanout_only_pipeline():
@@ -155,9 +156,27 @@ def test_only_fanout_create_execution_plan():
     assert subplan.steps[0].tag == StepTag.TRANSFORM
 
 
-def test_only_fanout_execute_pipeline():
+def test_only_fanout_execute_plan():
     fanout_pipeline = define_fanout_only_pipeline()
     plan = create_execution_plan(fanout_pipeline)
     results = execute_plan(fanout_pipeline, plan)
     out_list = list(results[1].success_data.value.items())
     assert out_list == [2, 3]
+
+
+def test_basic_fanout_fanin_execution_plan():
+    pipeline_def = define_basic_fanout_fanin_pipeline()
+    plan = create_execution_plan(pipeline_def)
+    assert len(plan.steps) == 3
+
+    assert plan.steps[0].tag == StepTag.TRANSFORM
+    assert plan.steps[1].tag == StepTag.SUBPLAN_EXECUTOR
+    assert plan.steps[2].tag == StepTag.TRANSFORM
+
+
+def test_basic_fanout_fanin_execute():
+    pipeline_def = define_basic_fanout_fanin_pipeline()
+    result = execute_pipeline(pipeline_def)
+    assert result.success
+    assert isinstance(result.result_for_solid('produce_sequence').transformed_value(), Sequence)
+    assert result.result_for_solid('consume_sequence').transformed_value() == [2, 3]

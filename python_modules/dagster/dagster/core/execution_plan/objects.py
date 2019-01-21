@@ -214,7 +214,8 @@ class ExecutionValueSubPlan(
 
 
 class ExecutionPlan(object):
-    def __init__(self, step_dict, deps):
+    def __init__(self, plan_id, step_dict, deps):
+        self.plan_id = check.str_param(plan_id, 'plan_id')
         self.step_dict = check.dict_param(
             step_dict, 'step_dict', key_type=str, value_type=ExecutionStep
         )
@@ -294,6 +295,7 @@ class PlanBuilder:
         self.plan_id = str(uuid.uuid4())
         self.steps = steps
         self.step_output_map = StepOutputMap()
+        self.plan_output_map = {}
 
 
 class StepOutputMap(dict):
